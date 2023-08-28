@@ -1,0 +1,9 @@
+{
+  "new_user": [
+    "🆕 Новый пользователь! \n\n",
+    "<b>id:</b> <code>{user.id}</code>\n",
+    "<b>userName:</b> {user.userName}\n",
+    "<b>firstName:</b> {user.firstName}\n",
+    "<b>lastName:</b> {user.lastName}"
+  ]
+}
