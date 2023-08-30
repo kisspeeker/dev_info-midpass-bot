@@ -75,7 +75,7 @@ export class OrdersService {
     });
   }
 
-  async getStatusFromMidpass(
+  private async getStatusFromMidpass(
     order: Order,
   ): Promise<{ updateOrderDto: UpdateOrderDto; proxy: string }> {
     try {
@@ -118,11 +118,9 @@ export class OrdersService {
       user.orders.filter((order) => !order.isDeleted).length >=
       USER_MAX_COUNT_CODES
     ) {
-      this.logger.error(
-        LogsTypes.ErrorUserHasMaxCountCodes,
-        createOrderDto.uid,
-        { user },
-      );
+      this.logger.error(LogsTypes.ErrorUserOrdersMaxCount, createOrderDto.uid, {
+        user,
+      });
       return null;
     }
 

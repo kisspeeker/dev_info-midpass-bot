@@ -1,4 +1,3 @@
-export const START_CRONJOB_IMMEDIATELY = false;
 export const USER_MAX_COUNT_CODES = 2;
 export const CODE_UID_SHORT_LENGTH = 6;
 

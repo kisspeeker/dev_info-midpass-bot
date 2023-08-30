@@ -16,7 +16,7 @@ export enum LogsTypes {
   ErrorOrderRequest = 'ERROR_ORDER_REQUEST',
   ErrorOrderNotFound = 'ERROR_ORDER_NOT_FOUND',
   ErrorOrdersNotFound = 'ERROR_ORDERS_NOT_FOUND',
-  ErrorUserHasMaxCountCodes = 'ERROR_USER_HAS_MAX_COUNT_CODES',
+  ErrorUserOrdersMaxCount = 'ERROR_USER_ORDERS_MAX_COUNT',
 
   DbUserCreated = 'DB_USER_CREATED',
   DbOrderCreated = 'DB_ORDER_CREATED',
@@ -24,6 +24,10 @@ export enum LogsTypes {
   DbOrderDeleted = 'DB_ORDER_DELETED',
   DbOrderAuditCreated = 'DB_ORDER_AUDIT_CREATED',
 
+  TgBotStart = 'TG_BOT_START',
+  TgUserStart = 'TG_USER_START',
+
+  // TODO: сделать под единый стиль
   SuccessStart = 'SUCCESS_START',
   StartCronjob = 'START_CRONJOB',
   EndCronjob = 'END_CRONJOB',
@@ -39,14 +43,22 @@ export enum LogsTypes {
   BotStart = 'BOT_START',
 }
 
-export enum MetaKeys {
-  Code = 'CODE',
-  CodeUid = 'CODE_UID',
-  CounterUsersWithCodes = 'COUNTER_USERS_WITH_CODES',
-  CounterUsersChecked = 'COUNTER_USERS_CHECKED',
-  CounterCodes = 'COUNTER_CODES',
-  CounterCodesUpdated = 'COUNTER_CODES_UPDATED',
-  CounterCodesError = 'COUNTER_CODES_ERROR',
-  CounterRoutes = 'COUNTER_ROUTES',
-  CronjobDuration = 'CRONJOB_DURATION',
+export enum TextCommands {
+  AdminSend = 'написать',
+  AdminTest = 'test',
+
+  Start1 = 'start',
+  Start2 = 'старт',
+  Start3 = 'начать',
+  Help1 = 'help',
+  Help2 = '/help',
+  Help3 = 'помощь',
+  Help4 = '/помощь',
+
+  Faq = 'faq',
+  Schedule = 'расписание',
+
+  Unsubscribe = 'отписаться',
+  Status = 'статус',
+  StatusUpdate = 'обновить',
 }
