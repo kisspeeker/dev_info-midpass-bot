@@ -3,14 +3,17 @@ import { START_CRONJOB_IMMEDIATELY } from 'src/constants';
 import { Telegraf } from 'telegraf';
 import { LoggerService } from 'src/logger/logger.service';
 import { LogsTypes } from 'src/enums';
-import { UserService } from 'src/user/user.service';
+import { UsersService } from 'src/user/user.service';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
+import { OrdersService } from 'src/order/order.service';
 
 @Injectable()
 export class TelegramService {
   private bot: Telegraf;
 
   constructor(
+    private readonly usersService: UsersService,
+    private readonly ordersService: OrdersService,
     private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
   ) {
@@ -19,24 +22,27 @@ export class TelegramService {
   }
 
   private initBot() {
-    this.bot.start((ctx) => {
-      ctx.reply('Welcome to the bot!');
-    });
+    this.bot.start((ctx) => this.handleBotStart(ctx));
+
+    this.bot.on('text', (ctx) => this.handleBotText(ctx));
 
     this.bot.catch((e) => {
       console.error('=== BOT CATCH ===', e);
     });
+  }
 
-    this.bot.on('text', async (ctx) => {
-      ctx.reply(
-        this.i18n.t('admin.new_user', {
-          user: UserService.useFactory(ctx.from),
-        }),
-        {
-          parse_mode: 'HTML',
-        },
-      );
-    });
+  private async handleBotStart(ctx) {
+    const res = await this.usersService.create(ctx.from);
+    console.warn(res);
+  }
+
+  private async handleBotText(ctx) {
+    try {
+      const user = await this.usersService.create(ctx.from);
+      console.warn(user);
+    } catch (e) {
+      this.logger.error(LogsTypes.Error, e);
+    }
   }
 
   startBot() {

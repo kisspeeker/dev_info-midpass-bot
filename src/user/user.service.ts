@@ -1,54 +1,61 @@
 import { Injectable } from '@nestjs/common';
-import { User } from './user.interface';
-import { LoggerService } from 'src/logger/logger.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Context } from 'telegraf';
+
 import { LogsTypes } from 'src/enums';
+import { LoggerService } from 'src/logger/logger.service';
+import { User } from 'src/user/entity/user.entity';
+import { CreateUserDto } from 'src/user/dto/create-user.dto';
 
 @Injectable()
-export class UserService {
-  private users: User[] = [];
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+    private readonly logger: LoggerService,
+  ) {}
 
-  constructor(private readonly logger: LoggerService) {}
+  async create(createUserDto: CreateUserDto) {
+    const newUser = this.usersRepository.create({
+      id: String(createUserDto.id),
+      firstName: createUserDto.first_name,
+      lastName: createUserDto.last_name,
+      userName: createUserDto.username ? `@${createUserDto.username}` : '',
+      orders: [],
+    });
 
-  static useFactory(raw: User | unknown): User {
-    if (typeof raw !== 'object' || raw === null) {
-      throw new Error('Invalid rawOrder type');
-    }
+    await this.usersRepository.save(newUser);
 
-    const currentUser = raw as Partial<User>;
-
-    return {
-      id: String(currentUser.id),
-      firstName: currentUser.first_name || currentUser.firstName,
-      lastName: currentUser.last_name || currentUser.lastName,
-      userName:
-        currentUser.userName ||
-        (currentUser.username ? `@${currentUser.username}` : ''),
-      orders: Array.isArray(currentUser.orders) ? currentUser.orders : [],
-    };
-  }
-
-  findUserById(id = '') {
-    return this.users.find((user: User) => user.id === id);
-  }
-
-  findUserIndexById(id = '') {
-    return this.users.findIndex((user: User) => user.id === id);
-  }
-
-  createUser(ctx: Context) {
-    const newUser = UserService.useFactory(ctx.from);
-    this.users.push(newUser);
     return newUser;
   }
 
-  updateUser(user: User) {
-    const userIndex = this.findUserIndexById(user.id);
-    if (userIndex >= 0) {
-      this.users[userIndex] = UserService.useFactory(user);
-      return this.users[userIndex];
+  async findAll() {
+    return await this.usersRepository.find({ relations: ['orders'] });
+  }
+
+  async findAllWithOrders() {
+    const queryBuilder: SelectQueryBuilder<User> =
+      this.usersRepository.createQueryBuilder('user');
+
+    queryBuilder.innerJoinAndSelect('user.orders', 'order');
+    queryBuilder.groupBy('user.id');
+    queryBuilder.having('COUNT(order.uid) > 0');
+
+    return queryBuilder.getMany();
+  }
+
+  async find(ctx: Context) {
+    let user = await this.usersRepository.findOne({
+      where: { id: String(ctx.from.id) },
+      relations: ['orders'],
+    });
+
+    if (!user) {
+      this.logger.error(LogsTypes.ErrorUserNotFound, String(ctx.from.id));
+      user = await this.create(ctx.from);
     }
-    // TODO: user is not defined
-    this.logger.log(LogsTypes.Error, 'user is not defined', user);
+
+    return user;
   }
 }

@@ -1,33 +1,37 @@
 import { Injectable } from '@nestjs/common';
-import { LogsTypes } from 'src/enums';
 import { createLogger, transports, format } from 'winston';
 import * as DailyRotateFile from 'winston-daily-rotate-file';
+
+import { LogsTypes } from 'src/enums';
 
 @Injectable()
 export class LoggerService {
   private logger = createLogger({
     format: format.combine(
-      format.timestamp(),
       format.printf(({ level, message, logtype, meta }) => {
         const date = new Intl.DateTimeFormat('ru-RU', {
           timeStyle: 'medium',
           dateStyle: 'short',
           timeZone: 'Europe/Moscow',
-        });
+        })
+          .format()
+          .replace(/\./g, '-');
 
         const metaString = meta ? `META<<<${JSON.stringify(meta)}>>>META` : '';
 
-        return `${date.format()} / ${logtype} [${level}]: ${message} ${metaString}`;
+        return `${date} мск / ${logtype} [${level}]: ${message} ${metaString}`;
       }),
     ),
+
     transports: [
       new transports.Console(), // Запись в консоль
       new DailyRotateFile({
-        filename: 'logs/%DATE%-midpass-bot.log', // Файлы будут называться вида 27-08-2023-info-midpass-bot.log
-        datePattern: 'DD-MM-YYYY', // Паттерн для разделения файлов по датам
-        zippedArchive: true, // Архивирование старых файлов
-        maxSize: '20m', // Максимальный размер файла перед перезаписью
-        maxFiles: '6m', // Сохранять файлы за последние 6 месяцев
+        filename: 'logs/%DATE%-midpass-bot.log',
+        datePattern: 'DD-MM-YYYY',
+        utc: true,
+        zippedArchive: true,
+        maxSize: '20m',
+        maxFiles: '6m',
       }),
     ],
   });

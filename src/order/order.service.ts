@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Order } from './order.interface';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
 import {
   CODE_UID_SHORT_LENGTH,
   FALSY_PASSPORT_STATUSES,
@@ -7,12 +9,23 @@ import {
 } from 'src/constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { LogsTypes } from 'src/enums';
+import { CreateOrderDto } from 'src/order/dto/create-order.dto';
+import { UpdateOrderDto } from 'src/order/dto/update-order.dto';
+import { User } from 'src/user/entity/user.entity';
+import { Order } from 'src/order/entity/order.entity';
+import { OrderAuditLog } from 'src/order/entity/order-audit-log.entity';
+import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 
 @Injectable()
-export class OrderService {
-  private orders: Order[] = [];
-
-  constructor(private readonly logger: LoggerService) {}
+export class OrdersService {
+  constructor(
+    @InjectRepository(OrderAuditLog)
+    private ordersAuditLogRepository: Repository<OrderAuditLog>,
+    @InjectRepository(Order)
+    private ordersRepository: Repository<Order>,
+    private readonly logger: LoggerService,
+    private readonly i18n: CustomI18nService,
+  ) {}
 
   static isValidUid(uid = '') {
     return uid && String(uid).length === 25;
@@ -24,8 +37,8 @@ export class OrderService {
 
   static isCompleteOrder(order: Order) {
     return (
-      order.internalStatus.percent === 0 &&
-      FALSY_PASSPORT_STATUSES.includes(order.internalStatus.name.toLowerCase())
+      order.statusPercent === 0 &&
+      FALSY_PASSPORT_STATUSES.includes(order.statusInternalName.toLowerCase())
     );
   }
 
@@ -40,133 +53,180 @@ export class OrderService {
     }
   }
 
-  static useFactory(raw: Order | unknown, needUpdateTime = true): Order {
-    if (typeof raw !== 'object' || raw === null) {
-      throw new Error('Invalid rawOrder type');
-    }
-
-    const currentOrder = raw as Partial<Order>;
-
-    return {
-      uid: currentOrder?.uid,
-      shortUid:
-        currentOrder?.shortUid ||
-        `*${currentOrder?.uid.slice(-CODE_UID_SHORT_LENGTH)}`,
-      sourceUid: currentOrder?.sourceUid,
-      receptionDate:
-        currentOrder?.receptionDate ||
-        this.parseReceptionDateFromUid(currentOrder?.uid),
-      passportStatus: {
-        passportStatusId: currentOrder?.passportStatus?.id,
-        name: currentOrder?.passportStatus?.name,
-        description: currentOrder?.passportStatus?.description,
-        color: currentOrder?.passportStatus?.color,
-        subscription: currentOrder?.passportStatus?.subscription,
-      },
-      internalStatus: {
-        name: currentOrder?.internalStatus?.name,
-        percent: currentOrder?.internalStatus?.percent,
-      },
-      updateTime: (currentOrder?.updateTime && !needUpdateTime
-        ? new Date(currentOrder?.updateTime)
-        : new Date()
-      ).toLocaleString('en-EN'),
-    };
-  }
-
-  get hasOrders() {
-    return !!this.orders.length;
-  }
-
-  get hasMaxCountOrders() {
-    return this.hasOrders && this.orders.length >= USER_MAX_COUNT_CODES;
-  }
-
-  get orderStatuses() {
-    return this.orders.map((order) => this.getOrderStatus(order));
-  }
-
-  findOrderByUid(searchUidPart = '') {
-    return this.orders.find((order: Order) =>
-      String(order.uid).endsWith(searchUidPart.replace('*', '')),
+  static hasChangesWith(currentOrder: Order, newOrder: UpdateOrderDto) {
+    return (
+      currentOrder.statusPercent !== newOrder.internalStatus.percent ||
+      currentOrder.statusName !== newOrder.passportStatus.name ||
+      currentOrder.statusInternalName !== newOrder.internalStatus.name
     );
   }
 
-  findOrderIndexByUid(searchUidPart = '') {
-    return this.orders.findIndex((order: Order) =>
-      String(order.uid).endsWith(searchUidPart.replace('*', '')),
+  static getLocaleOrderUpdateTime(order: Order) {
+    return new Date(order.updatedAt).toLocaleString('ru-RU', {
+      timeStyle: 'medium',
+      dateStyle: 'short',
+      timeZone: 'Europe/Moscow',
+    });
+  }
+
+  getLocaleOrderStatus(order: Order) {
+    return (
+      (order.statusName ? '' : this.i18n.t('order_empty')) +
+      this.i18n.t('order_status_beauty', {
+        order,
+        updateTime: OrdersService.getLocaleOrderUpdateTime(order),
+      })
     );
   }
 
-  createOrder(uid = '') {
-    if (!this.hasMaxCountOrders) {
-      const newOrder = OrderService.useFactory({ uid });
-      this.orders.push(newOrder);
-      return newOrder;
-    }
-    // TODO: Messages.MAX_COUNT_CODES
-    this.logger.log(
-      LogsTypes.UserHasMaxCountCodes,
-      'Messages.MAX_COUNT_CODES',
-      { uid },
-    );
-  }
-
-  updateOrder(order: Order) {
-    const orderIndex = this.findOrderIndexByUid(order.uid);
-    if (orderIndex >= 0) {
-      this.orders[orderIndex] = OrderService.useFactory(order);
-      return this.orders[orderIndex];
-    }
-    // TODO: order is not defined
-    this.logger.log(LogsTypes.Error, 'order is not defined', order);
-  }
-
-  removeOrder(order: Order) {
-    this.orders = this.orders.filter((x) => x.uid !== order.uid);
-  }
-
-  removeAllOrders() {
-    this.orders = [];
-  }
-
-  getOrderStatus(order: Order) {
-    const currentOrder = this.findOrderByUid(order.uid);
-    if (currentOrder) {
-      return (
-        (currentOrder.passportStatus?.name
-          ? ''
-          : 'Messages.CODE_STATUS_EMPTY') + 'Messages.CODE_STATUS(this)' // TODO: Messages.CODE_STATUS_EMPTY
+  async create(createOrderDto: CreateOrderDto, user: User) {
+    if (
+      user.orders.filter((order) => !order.isDeleted).length >=
+      USER_MAX_COUNT_CODES
+    ) {
+      this.logger.error(
+        LogsTypes.ErrorUserHasMaxCountCodes,
+        createOrderDto.uid,
+        user,
       );
+      return null;
     }
-    // TODO: order is not defined
-    this.logger.log(LogsTypes.Error, 'order is not defined', order);
+
+    const existingOrder = await this.ordersRepository.findOneBy({
+      uid: createOrderDto.uid,
+      isDeleted: false,
+    });
+
+    if (existingOrder && existingOrder.userId !== user.id) {
+      this.logger.error(
+        LogsTypes.ErrorUserNotAllowedToUpdateOrder,
+        createOrderDto.uid,
+        user,
+      );
+      return null;
+    }
+
+    const newOrder = this.ordersRepository.create({
+      uid: String(createOrderDto.uid),
+      receptionDate: OrdersService.parseReceptionDateFromUid(
+        createOrderDto.uid,
+      ),
+      isDeleted: false,
+      user,
+    });
+
+    await this.createAuditLog(newOrder, user);
+
+    await this.ordersRepository.save(newOrder);
+
+    return newOrder;
   }
 
-  getOrderUpdateTimeString(order: Order) {
-    const currentOrder = this.findOrderByUid(order.uid);
-    if (currentOrder) {
-      return new Date(currentOrder.updateTime).toLocaleString('ru-RU', {
-        timeStyle: 'medium',
-        dateStyle: 'short',
-        timeZone: 'Europe/Moscow',
+  async createAuditLog(newOrder: Order, user: User, oldOrder?: Order) {
+    const auditLog = this.ordersAuditLogRepository.create({
+      orderUid: newOrder.uid,
+      userId: user.id,
+      oldStatusId: oldOrder?.statusId,
+      newStatusId: newOrder.statusId,
+      oldStatusName: oldOrder?.statusName,
+      newStatusName: newOrder.statusName,
+      oldStatusInternalName: oldOrder?.statusInternalName,
+      newStatusInternalName: newOrder.statusInternalName,
+      oldStatusPercent: oldOrder?.statusPercent,
+      newStatusPercent: newOrder.statusPercent,
+      isDeleted: newOrder.isDeleted,
+    });
+
+    await this.ordersAuditLogRepository.save(auditLog);
+  }
+
+  async update(updateOrderDto: UpdateOrderDto, user: User) {
+    const existingOrder = await this.ordersRepository.findOneBy({
+      uid: updateOrderDto.uid,
+    });
+
+    if (existingOrder) {
+      if (existingOrder.userId !== user.id) {
+        this.logger.error(
+          LogsTypes.ErrorUserNotAllowedToUpdateOrder,
+          updateOrderDto.uid,
+          user,
+        );
+        return null;
+      }
+      const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
+
+      (existingOrder.sourceUid = updateOrderDto.sourceUid),
+        (existingOrder.receptionDate = updateOrderDto.receptionDate),
+        (existingOrder.statusId =
+          updateOrderDto.passportStatus.passportStatusId),
+        (existingOrder.statusName = updateOrderDto.passportStatus.name),
+        (existingOrder.statusDescription =
+          updateOrderDto.passportStatus.description),
+        (existingOrder.statusColor = updateOrderDto.passportStatus.color),
+        (existingOrder.statusSubscription =
+          updateOrderDto.passportStatus.subscription),
+        (existingOrder.statusInternalName = updateOrderDto.internalStatus.name),
+        (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
+        (existingOrder.isDeleted = false),
+        await this.ordersRepository.save(existingOrder);
+
+      await this.createAuditLog(existingOrder, user, oldOrder);
+
+      return existingOrder;
+    } else {
+      this.logger.error(LogsTypes.ErrorOrderNotFound, updateOrderDto.uid);
+      return null;
+    }
+  }
+
+  async delete(uid: string, user: User) {
+    const existingOrder = await this.ordersRepository.findOneBy({
+      uid,
+    });
+
+    if (existingOrder) {
+      if (existingOrder.userId !== user.id) {
+        this.logger.error(
+          LogsTypes.ErrorUserNotAllowedToUpdateOrder,
+          uid,
+          user,
+        );
+        return null;
+      }
+
+      existingOrder.isDeleted = true;
+      await this.ordersRepository.save(existingOrder);
+
+      await this.createAuditLog(existingOrder, user);
+
+      return existingOrder;
+    } else {
+      this.logger.error(LogsTypes.ErrorOrderNotFound, uid);
+      return null;
+    }
+  }
+
+  async deleteAll(user: User) {
+    const existingOrders = await this.ordersRepository.findBy({
+      userId: user.id,
+    });
+
+    if (Array.isArray(existingOrders) && existingOrders.length) {
+      existingOrders.forEach((order) => {
+        order.isDeleted = true;
       });
-    }
-    // TODO: order is not defined
-    this.logger.log(LogsTypes.Error, 'order is not defined', order);
-  }
 
-  hasChangesWith(order: Order, newOrder: Order) {
-    const currentOrder = this.findOrderByUid(order.uid);
-    if (currentOrder) {
-      return (
-        currentOrder.internalStatus.percent !==
-          newOrder.internalStatus.percent ||
-        currentOrder.passportStatus.name !== newOrder.passportStatus.name ||
-        currentOrder.internalStatus.name !== newOrder.internalStatus.name
-      );
+      await this.ordersRepository.save(existingOrders);
+
+      for (const order of existingOrders) {
+        await this.createAuditLog(order, user);
+      }
+
+      return existingOrders;
+    } else {
+      this.logger.error(LogsTypes.ErrorUserOrdersNotFound, user.id);
+      return null;
     }
-    // TODO: order is not defined
-    this.logger.log(LogsTypes.Error, 'order is not defined', order);
   }
 }

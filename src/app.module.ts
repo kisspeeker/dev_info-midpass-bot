@@ -1,13 +1,18 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
-import { TelegramModule } from './telegram/telegram.module';
-import { UserModule } from './user/user.module';
-import { OrderModule } from './order/order.module';
-import { LoggerModule } from './logger/logger.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
-import { CustomI18nModule } from './i18n/custom-i18n.module';
+
+import { CustomI18nModule } from 'src//i18n/custom-i18n.module';
+import { TelegramModule } from 'src/telegram/telegram.module';
+import { LoggerModule } from 'src/logger/logger.module';
+import { Usersmodule } from 'src/user/user.module';
+import { Ordersmodule } from 'src/order/order.module';
+import { User } from 'src/user/entity/user.entity';
+import { Order } from 'src/order/entity/order.entity';
 
 @Module({
   imports: [
@@ -28,11 +33,19 @@ import { CustomI18nModule } from './i18n/custom-i18n.module';
         AcceptLanguageResolver,
       ],
     }),
+    TypeOrmModule.forRoot({
+      type: 'sqlite',
+      database: 'info-midpass-bot.db',
+      entities: [User, Order],
+      synchronize: true,
+    }),
     TelegramModule,
-    UserModule,
-    OrderModule,
+    Usersmodule,
+    Ordersmodule,
     LoggerModule,
     CustomI18nModule,
   ],
 })
-export class AppModule {}
+export class AppModule {
+  constructor(private dataSource: DataSource) {}
+}

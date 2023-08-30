@@ -1,23 +1,21 @@
-export interface Order {
+export class UpdateOrderDto {
   uid: string;
-  shortUid: string;
   sourceUid: string;
   receptionDate: string;
-  updateTime: string;
   passportStatus: OrderPassportStatus;
   internalStatus: OrderInternalStatus;
 }
 
-interface OrderPassportStatus {
+export interface OrderPassportStatus {
   id?: string;
-  passportStatusId: string;
+  passportStatusId: number;
   name: string;
   description: string;
   color: string;
-  subscription: string;
+  subscription: boolean;
 }
 
-interface OrderInternalStatus {
+export interface OrderInternalStatus {
   name: string;
   percent: number;
 }
