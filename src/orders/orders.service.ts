@@ -1,23 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { HttpService } from '@nestjs/axios';
 import { Repository } from 'typeorm';
+import { firstValueFrom } from 'rxjs';
 
 import {
+  API_ROUTE_MIDPASS_PROXIES,
   CODE_UID_SHORT_LENGTH,
   FALSY_PASSPORT_STATUSES,
   USER_MAX_COUNT_CODES,
 } from 'src/constants';
-import { LoggerService } from 'src/logger/logger.service';
 import { LogsTypes } from 'src/enums';
-import { CreateOrderDto } from 'src/order/dto/create-order.dto';
-import { UpdateOrderDto } from 'src/order/dto/update-order.dto';
-import { User } from 'src/user/entity/user.entity';
-import { Order } from 'src/order/entity/order.entity';
-import { OrderAuditLog } from 'src/order/entity/order-audit-log.entity';
+import { LoggerService } from 'src/logger/logger.service';
+import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
+import { UpdateOrderDto } from 'src/orders/dto/update-order.dto';
+import { User } from 'src/users/entity/user.entity';
+import { Order } from 'src/orders/entity/order.entity';
+import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 
 @Injectable()
 export class OrdersService {
+  private proxyIndex = 0;
+
   constructor(
     @InjectRepository(OrderAuditLog)
     private ordersAuditLogRepository: Repository<OrderAuditLog>,
@@ -25,6 +30,7 @@ export class OrdersService {
     private ordersRepository: Repository<Order>,
     private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
+    private readonly httpService: HttpService,
   ) {}
 
   static isValidUid(uid = '') {
@@ -69,6 +75,34 @@ export class OrdersService {
     });
   }
 
+  async getStatusFromMidpass(
+    order: Order,
+  ): Promise<{ updateOrderDto: UpdateOrderDto; proxy: string }> {
+    try {
+      if (!API_ROUTE_MIDPASS_PROXIES[this.proxyIndex]) {
+        this.proxyIndex = 0;
+      }
+      const proxy = API_ROUTE_MIDPASS_PROXIES[this.proxyIndex];
+
+      const updateOrderDto = (
+        await firstValueFrom(this.httpService.get(`${proxy}/${order.uid}`))
+      ).data;
+
+      this.proxyIndex++;
+
+      if (!updateOrderDto) {
+        this.logger.error(LogsTypes.ErrorOrderRequest, order.uid, { order });
+        throw LogsTypes.ErrorOrderRequest;
+      }
+      return {
+        updateOrderDto,
+        proxy,
+      };
+    } catch (error) {
+      this.logger.error(LogsTypes.ErrorOrderRequest, order.uid, { order });
+    }
+  }
+
   getLocaleOrderStatus(order: Order) {
     return (
       (order.statusName ? '' : this.i18n.t('order_empty')) +
@@ -87,7 +121,7 @@ export class OrdersService {
       this.logger.error(
         LogsTypes.ErrorUserHasMaxCountCodes,
         createOrderDto.uid,
-        user,
+        { user },
       );
       return null;
     }
@@ -101,7 +135,7 @@ export class OrdersService {
       this.logger.error(
         LogsTypes.ErrorUserNotAllowedToUpdateOrder,
         createOrderDto.uid,
-        user,
+        { user },
       );
       return null;
     }
@@ -115,9 +149,12 @@ export class OrdersService {
       user,
     });
 
-    await this.createAuditLog(newOrder, user);
-
     await this.ordersRepository.save(newOrder);
+
+    this.logger.log(LogsTypes.DbOrderCreated, newOrder.uid, {
+      order: newOrder,
+    });
+    await this.createAuditLog(newOrder, user);
 
     return newOrder;
   }
@@ -137,47 +174,38 @@ export class OrdersService {
       isDeleted: newOrder.isDeleted,
     });
 
-    await this.ordersAuditLogRepository.save(auditLog);
+    const res = await this.ordersAuditLogRepository.save(auditLog);
+    this.logger.log(LogsTypes.DbOrderAuditCreated, res.id);
   }
 
-  async update(updateOrderDto: UpdateOrderDto, user: User) {
-    const existingOrder = await this.ordersRepository.findOneBy({
-      uid: updateOrderDto.uid,
+  async update(existingOrder: Order, user: User) {
+    const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
+    const midpassResult = await this.getStatusFromMidpass(existingOrder);
+    const updateOrderDto = midpassResult.updateOrderDto;
+
+    (existingOrder.sourceUid = updateOrderDto.sourceUid),
+      (existingOrder.receptionDate = updateOrderDto.receptionDate),
+      (existingOrder.statusId = updateOrderDto.passportStatus.passportStatusId),
+      (existingOrder.statusName = updateOrderDto.passportStatus.name),
+      (existingOrder.statusDescription =
+        updateOrderDto.passportStatus.description),
+      (existingOrder.statusColor = updateOrderDto.passportStatus.color),
+      (existingOrder.statusSubscription =
+        updateOrderDto.passportStatus.subscription),
+      (existingOrder.statusInternalName = updateOrderDto.internalStatus.name),
+      (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
+      (existingOrder.isDeleted = false),
+      await this.ordersRepository.save(existingOrder);
+
+    this.logger.log(LogsTypes.DbOrderUpdated, existingOrder.uid, {
+      order: existingOrder,
     });
+    await this.createAuditLog(existingOrder, user, oldOrder);
 
-    if (existingOrder) {
-      if (existingOrder.userId !== user.id) {
-        this.logger.error(
-          LogsTypes.ErrorUserNotAllowedToUpdateOrder,
-          updateOrderDto.uid,
-          user,
-        );
-        return null;
-      }
-      const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
-
-      (existingOrder.sourceUid = updateOrderDto.sourceUid),
-        (existingOrder.receptionDate = updateOrderDto.receptionDate),
-        (existingOrder.statusId =
-          updateOrderDto.passportStatus.passportStatusId),
-        (existingOrder.statusName = updateOrderDto.passportStatus.name),
-        (existingOrder.statusDescription =
-          updateOrderDto.passportStatus.description),
-        (existingOrder.statusColor = updateOrderDto.passportStatus.color),
-        (existingOrder.statusSubscription =
-          updateOrderDto.passportStatus.subscription),
-        (existingOrder.statusInternalName = updateOrderDto.internalStatus.name),
-        (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
-        (existingOrder.isDeleted = false),
-        await this.ordersRepository.save(existingOrder);
-
-      await this.createAuditLog(existingOrder, user, oldOrder);
-
-      return existingOrder;
-    } else {
-      this.logger.error(LogsTypes.ErrorOrderNotFound, updateOrderDto.uid);
-      return null;
-    }
+    return {
+      order: existingOrder,
+      proxy: midpassResult.proxy,
+    };
   }
 
   async delete(uid: string, user: User) {
@@ -187,22 +215,21 @@ export class OrdersService {
 
     if (existingOrder) {
       if (existingOrder.userId !== user.id) {
-        this.logger.error(
-          LogsTypes.ErrorUserNotAllowedToUpdateOrder,
-          uid,
+        this.logger.error(LogsTypes.ErrorUserNotAllowedToUpdateOrder, uid, {
           user,
-        );
+        });
         return null;
       }
 
       existingOrder.isDeleted = true;
       await this.ordersRepository.save(existingOrder);
 
+      this.logger.log(LogsTypes.DbOrderDeleted, existingOrder.uid, { user });
       await this.createAuditLog(existingOrder, user);
 
       return existingOrder;
     } else {
-      this.logger.error(LogsTypes.ErrorOrderNotFound, uid);
+      this.logger.error(LogsTypes.ErrorOrderNotFound, uid, { user });
       return null;
     }
   }
@@ -220,12 +247,13 @@ export class OrdersService {
       await this.ordersRepository.save(existingOrders);
 
       for (const order of existingOrders) {
+        this.logger.log(LogsTypes.DbOrderDeleted, order.uid, { user });
         await this.createAuditLog(order, user);
       }
 
       return existingOrders;
     } else {
-      this.logger.error(LogsTypes.ErrorUserOrdersNotFound, user.id);
+      this.logger.error(LogsTypes.ErrorOrdersNotFound, user.id);
       return null;
     }
   }

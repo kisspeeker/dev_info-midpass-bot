@@ -9,10 +9,10 @@ import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
 import { CustomI18nModule } from 'src//i18n/custom-i18n.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { LoggerModule } from 'src/logger/logger.module';
-import { Usersmodule } from 'src/user/user.module';
-import { Ordersmodule } from 'src/order/order.module';
-import { User } from 'src/user/entity/user.entity';
-import { Order } from 'src/order/entity/order.entity';
+import { UsersModule } from 'src/users/users.module';
+import { OrdersModule } from 'src/orders/orders.module';
+import { User } from 'src/users/entity/user.entity';
+import { Order } from 'src/orders/entity/order.entity';
 
 @Module({
   imports: [
@@ -40,8 +40,8 @@ import { Order } from 'src/order/entity/order.entity';
       synchronize: true,
     }),
     TelegramModule,
-    Usersmodule,
-    Ordersmodule,
+    UsersModule,
+    OrdersModule,
     LoggerModule,
     CustomI18nModule,
   ],

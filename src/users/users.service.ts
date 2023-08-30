@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
-import { Context } from 'telegraf';
 
 import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
-import { User } from 'src/user/entity/user.entity';
-import { CreateUserDto } from 'src/user/dto/create-user.dto';
+import { User } from 'src/users/entity/user.entity';
+import { CreateUserDto } from 'src/users/dto/create-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -26,6 +25,7 @@ export class UsersService {
     });
 
     await this.usersRepository.save(newUser);
+    this.logger.log(LogsTypes.DbUserCreated, newUser.id, newUser);
 
     return newUser;
   }
@@ -45,15 +45,15 @@ export class UsersService {
     return queryBuilder.getMany();
   }
 
-  async find(ctx: Context) {
+  async find(createUserDto: CreateUserDto) {
     let user = await this.usersRepository.findOne({
-      where: { id: String(ctx.from.id) },
+      where: { id: String(createUserDto.id) },
       relations: ['orders'],
     });
 
     if (!user) {
-      this.logger.error(LogsTypes.ErrorUserNotFound, String(ctx.from.id));
-      user = await this.create(ctx.from);
+      this.logger.error(LogsTypes.ErrorUserNotFound, String(createUserDto.id));
+      user = await this.create(createUserDto);
     }
 
     return user;

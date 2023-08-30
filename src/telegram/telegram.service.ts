@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { START_CRONJOB_IMMEDIATELY } from 'src/constants';
 import { Telegraf } from 'telegraf';
-import { LoggerService } from 'src/logger/logger.service';
+
 import { LogsTypes } from 'src/enums';
-import { UsersService } from 'src/user/user.service';
+import { LoggerService } from 'src/logger/logger.service';
+import { UsersService } from 'src/users/users.service';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
-import { OrdersService } from 'src/order/order.service';
+import { OrdersService } from 'src/orders/orders.service';
 
 @Injectable()
 export class TelegramService {
@@ -38,7 +39,8 @@ export class TelegramService {
 
   private async handleBotText(ctx) {
     try {
-      const user = await this.usersService.create(ctx.from);
+      console.warn(ctx.from);
+      const user = await this.usersService.find(ctx.from);
       console.warn(user);
     } catch (e) {
       this.logger.error(LogsTypes.Error, e);

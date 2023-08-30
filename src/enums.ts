@@ -9,13 +9,21 @@ export enum Timeouts {
 export enum LogsTypes {
   Error = 'ERROR',
   ErrorCronjobRoot = 'ERROR_CRONJOB_ROOT',
-  ErrorCronjobUserCode = 'ERROR_CRONJOB_USER_CODE',
+  ErrorCronjobUserOrder = 'ERROR_CRONJOB_USER_ORDER',
   ErrorBlockByUser = 'ERROR_BLOCK_BY_USER',
   ErrorUserNotFound = 'ERROR_USER_NOT_FOUND',
-  ErrorUserOrdersNotFound = 'ERROR_USER_ORDERS_NOT_FOUND',
   ErrorUserNotAllowedToUpdateOrder = 'ERROR_USER_NOT_ALLOWED_TO_UPDATE_ORDER',
+  ErrorOrderRequest = 'ERROR_ORDER_REQUEST',
   ErrorOrderNotFound = 'ERROR_ORDER_NOT_FOUND',
+  ErrorOrdersNotFound = 'ERROR_ORDERS_NOT_FOUND',
   ErrorUserHasMaxCountCodes = 'ERROR_USER_HAS_MAX_COUNT_CODES',
+
+  DbUserCreated = 'DB_USER_CREATED',
+  DbOrderCreated = 'DB_ORDER_CREATED',
+  DbOrderUpdated = 'DB_ORDER_UPDATED',
+  DbOrderDeleted = 'DB_ORDER_DELETED',
+  DbOrderAuditCreated = 'DB_ORDER_AUDIT_CREATED',
+
   SuccessStart = 'SUCCESS_START',
   StartCronjob = 'START_CRONJOB',
   EndCronjob = 'END_CRONJOB',
