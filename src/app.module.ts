@@ -13,6 +13,7 @@ import { UsersModule } from 'src/users/users.module';
 import { OrdersModule } from 'src/orders/orders.module';
 import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
+import { OrderAuditLog } from './orders/entity/order-audit-log.entity';
 
 @Module({
   imports: [
@@ -36,7 +37,7 @@ import { Order } from 'src/orders/entity/order.entity';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'info-midpass-bot.db',
-      entities: [User, Order],
+      entities: [User, Order, OrderAuditLog],
       synchronize: true,
     }),
     TelegramModule,

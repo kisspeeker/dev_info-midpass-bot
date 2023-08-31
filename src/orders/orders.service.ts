@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { HttpService } from '@nestjs/axios';
 import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
+import { resolve } from 'path';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fs = require('fs');
 
 import {
   API_ROUTE_MIDPASS_PROXIES,
@@ -75,6 +78,16 @@ export class OrdersService {
     });
   }
 
+  static async getStatusImage(order: Order) {
+    const statusImagePath = resolve(
+      `./public/images/${order.statusPercent}.png`,
+    );
+    if (fs.existsSync(statusImagePath)) {
+      return fs.createReadStream(statusImagePath);
+    }
+    return fs.createReadStream(resolve('./public/images/0.png'));
+  }
+
   private async getStatusFromMidpass(
     order: Order,
   ): Promise<{ updateOrderDto: UpdateOrderDto; proxy: string }> {
@@ -140,6 +153,7 @@ export class OrdersService {
 
     const newOrder = this.ordersRepository.create({
       uid: String(createOrderDto.uid),
+      shortUid: `*${createOrderDto.uid.slice(-CODE_UID_SHORT_LENGTH)}`,
       receptionDate: OrdersService.parseReceptionDateFromUid(
         createOrderDto.uid,
       ),

@@ -8,11 +8,15 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from 'src/users/entity/user.entity';
+import { calculateDaysDifference } from 'src/utils';
 
 @Entity()
 export class Order {
   @PrimaryColumn()
   uid: string;
+
+  @Column()
+  shortUid: string;
 
   @Column()
   userId: string;
@@ -26,7 +30,7 @@ export class Order {
   @Column({ nullable: true })
   statusId: number;
 
-  @Column({ nullable: true })
+  @Column({ default: '-' })
   statusName: string;
 
   @Column({ nullable: true })
@@ -38,10 +42,10 @@ export class Order {
   @Column({ nullable: true })
   statusSubscription: boolean;
 
-  @Column({ nullable: true })
+  @Column({ default: '-' })
   statusInternalName: string;
 
-  @Column({ nullable: true })
+  @Column({ default: 0 })
   statusPercent: number;
 
   @Column({ default: false })
@@ -56,4 +60,17 @@ export class Order {
   @ManyToOne(() => User, (user) => user.orders)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  get updatedAtTimeString() {
+    return new Date(this.updatedAt).toLocaleString('ru-RU', {
+      timeStyle: 'medium',
+      dateStyle: 'short',
+      timeZone: 'Europe/Moscow',
+    });
+  }
+
+  get daysPassed() {
+    const days = calculateDaysDifference(this.receptionDate);
+    return Number.isNaN(days) ? '-' : days;
+  }
 }

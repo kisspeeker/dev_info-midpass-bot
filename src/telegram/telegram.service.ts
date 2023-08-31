@@ -9,6 +9,7 @@ import { OrdersService } from 'src/orders/orders.service';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entity/user.entity';
 import { Message, Update } from 'telegraf/typings/core/types/typegram';
+import { Order } from 'src/orders/entity/order.entity';
 
 type TgContext = NarrowedContext<
   Context<Update>,
@@ -80,7 +81,7 @@ export class TelegramService {
           break;
         case TextCommands.AdminSend:
           if (user.id === this.adminId) {
-            this.handleAdminSend(ctx, user);
+            this.handleAdminSend(ctx);
             break;
           }
         case TextCommands.AdminTest:
@@ -89,6 +90,10 @@ export class TelegramService {
             break;
           }
         default:
+          if (OrdersService.isValidUid(textCommand)) {
+            this.handleUserSubscribe(ctx, user);
+            return;
+          }
           this.sendMessage(user, 'default');
       }
     } catch (e) {
@@ -112,16 +117,47 @@ export class TelegramService {
     console.warn('handleUserUnsubscribe');
   }
 
-  private async handleUserStatus(ctx: TgContext, user: User) {
-    console.warn('handleUserStatus');
+  private async handleUserSubscribe(ctx: TgContext, user: User) {
+    const uid = String(ctx.message.text.split(' ')[0]).trim();
+    const existingOrder = user.orders.find((order) => order.uid === uid);
+
+    if (existingOrder) {
+      await this.sendMessageStatus(user, existingOrder, 'subscribedAlready');
+      return;
+    }
+
+    const order = await this.ordersService.create({ uid }, user);
+
+    if (order) {
+      await this.sendMessageStatus(user, order, 'subscribed');
+    }
   }
 
-  private async handleAdminSend(ctx: TgContext, user: User) {
-    console.warn('handleAdminSend');
+  private async handleUserStatus(ctx: TgContext, user: User) {
+    const uid = String(ctx.message.text.split(' ')[1]).trim();
+
+    if (OrdersService.isValidUid(uid) || OrdersService.isValidUidShort(uid)) {
+      const existingOrder = user.orders.find(
+        (order) => order.uid === uid || order.shortUid === uid,
+      );
+
+      if (existingOrder) {
+        await this.sendMessageStatus(user, existingOrder);
+      }
+    }
+  }
+
+  private async handleAdminSend(ctx: TgContext) {
+    const userId = ctx.message.text.split(' ')[1];
+    const userToSend = await this.usersService.find({ id: userId });
+    const messageToUser = ctx.message.text.split(' ').slice(2).join(' ');
+
+    await this.sendMessage(userToSend, messageToUser, {
+      disable_notification: true,
+    });
   }
 
   private async handleAdminTest(ctx: TgContext, user: User) {
-    console.warn('handleAdminTest');
     await this.sendMessage(user, 'Тестовая команда для админа');
   }
 
@@ -161,11 +197,18 @@ export class TelegramService {
     return res.length ? Markup.inlineKeyboard.bind(this)(res).resize() : [];
   };
 
-  private async sendMessage(user: User, message: string) {
+  private async sendMessage(
+    user: User,
+    message: string,
+    extra: {
+      disable_notification?: boolean;
+    } = {},
+  ) {
     await this.bot.telegram.sendMessage(user.id, message, {
       parse_mode: 'HTML',
       disable_web_page_preview: true,
       ...this.useKeyboardDefault(user),
+      ...extra,
     });
   }
 
@@ -177,7 +220,40 @@ export class TelegramService {
     });
   }
 
-  private async sendImage(user: User, image, message?: string) {
+  private async sendMessageStatus(
+    user: User,
+    order: Order,
+    type?: 'changed' | 'subscribed' | 'subscribedAlready',
+  ) {
+    const image = await OrdersService.getStatusImage(order);
+    const orderBeauty = this.i18n.t('user.message_status_order_beauty', {
+      order,
+    });
+    const donate = this.i18n.t('user.message_donate');
+    let message = '';
+
+    if (!order.statusPercent) {
+      message = this.i18n.t('user.message_order_empty');
+    }
+
+    if (type === 'changed') {
+      message =
+        this.i18n.t('user.message_order_changed') +
+        message +
+        orderBeauty +
+        donate;
+    } else if (type === 'subscribed') {
+      message =
+        this.i18n.t('user.message_order_subscribed') + message + orderBeauty;
+    } else if (type === 'subscribedAlready') {
+      message =
+        this.i18n.t('user.message_order_subscribed_already') +
+        message +
+        orderBeauty;
+    } else {
+      message = message + orderBeauty;
+    }
+
     await this.bot.telegram.sendPhoto(
       user.id,
       {
@@ -190,15 +266,6 @@ export class TelegramService {
       },
     );
   }
-
-  // async getStatusImage(order: Order) {
-  //   const statusImagePath = resolve(
-  //     `./static/${order.statusPercent}.png`,
-  //   );
-  //   if (fs.existsSync(statusImagePath)) {
-  //     return fs.createReadStream(statusImagePath);
-  //   }
-  // }
 
   async startBot() {
     const usersCount = (await this.usersService.findAllWithOrders()).length;
