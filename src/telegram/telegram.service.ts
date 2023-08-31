@@ -130,7 +130,13 @@ export class TelegramService {
 
     if (order) {
       await this.sendMessageStatus(user, order, 'subscribed');
+      return;
     }
+
+    await this.sendMessage(
+      user,
+      this.i18n.t('user_errors.message_order_validate'),
+    );
   }
 
   private async handleUserStatus(ctx: TgContext, user: User) {
@@ -143,8 +149,19 @@ export class TelegramService {
 
       if (existingOrder) {
         await this.sendMessageStatus(user, existingOrder);
+      } else {
+        await this.sendMessage(
+          user,
+          this.i18n.t('user_errors.message_order_not_found'),
+        );
       }
+      return;
     }
+
+    await this.sendMessage(
+      user,
+      this.i18n.t('user_errors.message_order_validate'),
+    );
   }
 
   private async handleAdminSend(ctx: TgContext) {
