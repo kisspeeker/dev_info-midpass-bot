@@ -3,8 +3,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AcceptLanguageResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
+import { DataSource } from 'typeorm';
 
 import { CustomI18nModule } from 'src//i18n/custom-i18n.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
@@ -45,6 +46,7 @@ import { OrderAuditLog } from './orders/entity/order-audit-log.entity';
     OrdersModule,
     LoggerModule,
     CustomI18nModule,
+    ScheduleModule.forRoot(),
   ],
 })
 export class AppModule {

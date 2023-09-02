@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from 'src/users/entity/user.entity';
-import { calculateDaysDifference } from 'src/utils';
+import { calculateDaysDifference, getLocaleDateString } from 'src/utils';
 
 @Entity()
 export class Order {
@@ -45,7 +45,7 @@ export class Order {
   @Column({ default: '-' })
   statusInternalName: string;
 
-  @Column({ default: 0 })
+  @Column({ nullable: true })
   statusPercent: number;
 
   @Column({ default: false })
@@ -62,11 +62,7 @@ export class Order {
   user: User;
 
   get updatedAtTimeString() {
-    return new Date(this.updatedAt).toLocaleString('ru-RU', {
-      timeStyle: 'medium',
-      dateStyle: 'short',
-      timeZone: 'Europe/Moscow',
-    });
+    return getLocaleDateString(this.updatedAt);
   }
 
   get daysPassed() {

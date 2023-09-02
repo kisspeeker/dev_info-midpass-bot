@@ -9,9 +9,9 @@ const fs = require('fs');
 
 import {
   API_ROUTE_MIDPASS_PROXIES,
-  CODE_UID_SHORT_LENGTH,
+  ORDER_UID_SHORT_LENGTH,
   FALSY_PASSPORT_STATUSES,
-  USER_MAX_COUNT_CODES,
+  MAX_ORDERS_PER_USER,
 } from 'src/constants';
 import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
@@ -21,6 +21,7 @@ import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
 import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
+import { getLocaleDateString, isValidDate } from 'src/utils';
 
 @Injectable()
 export class OrdersService {
@@ -37,11 +38,11 @@ export class OrdersService {
   ) {}
 
   static isValidUid(uid = '') {
-    return uid && String(uid).length === 25;
+    return uid && String(uid).length === 25 && String(uid).startsWith('2000');
   }
 
   static isValidUidShort(shortUid = '') {
-    return shortUid && String(shortUid).length === CODE_UID_SHORT_LENGTH + 1;
+    return shortUid && String(shortUid).length === ORDER_UID_SHORT_LENGTH + 1;
   }
 
   static isCompleteOrder(order: Order) {
@@ -56,26 +57,19 @@ export class OrdersService {
       const [, , year, month, day] = String(uid).match(
         /^(\d{9})(\d{4})(\d{2})(\d{2})/,
       );
-      return `${year}-${month}-${day}`;
+      const result = `${year}-${month}-${day}`;
+      return isValidDate(result) ? result : '-';
     } catch (e) {
       console.error(e);
     }
   }
 
-  static hasChangesWith(currentOrder: Order, newOrder: UpdateOrderDto) {
+  static hasChangesWith(currentOrder: Order, newOrder: Order) {
     return (
-      currentOrder.statusPercent !== newOrder.internalStatus.percent ||
-      currentOrder.statusName !== newOrder.passportStatus.name ||
-      currentOrder.statusInternalName !== newOrder.internalStatus.name
+      currentOrder.statusPercent !== newOrder.statusPercent ||
+      currentOrder.statusName !== newOrder.statusName ||
+      currentOrder.statusInternalName !== newOrder.statusInternalName
     );
-  }
-
-  static getLocaleOrderUpdateTime(order: Order) {
-    return new Date(order.updatedAt).toLocaleString('ru-RU', {
-      timeStyle: 'medium',
-      dateStyle: 'short',
-      timeZone: 'Europe/Moscow',
-    });
   }
 
   static async getStatusImage(order: Order) {
@@ -85,26 +79,25 @@ export class OrdersService {
     if (fs.existsSync(statusImagePath)) {
       return fs.createReadStream(statusImagePath);
     }
-    return fs.createReadStream(resolve('./public/images/0.png'));
+    return fs.createReadStream(resolve('./public/images/fallback.png'));
   }
 
-  private async getStatusFromMidpass(
-    order: Order,
-  ): Promise<{ updateOrderDto: UpdateOrderDto; proxy: string }> {
-    try {
-      if (!API_ROUTE_MIDPASS_PROXIES[this.proxyIndex]) {
-        this.proxyIndex = 0;
-      }
-      const proxy = API_ROUTE_MIDPASS_PROXIES[this.proxyIndex];
+  private async getStatusFromMidpass(order: Order): Promise<{
+    proxy: string;
+    updateOrderDto?: UpdateOrderDto;
+    error?: unknown;
+  }> {
+    const proxy =
+      API_ROUTE_MIDPASS_PROXIES[
+        this.proxyIndex % API_ROUTE_MIDPASS_PROXIES.length
+      ];
 
+    try {
       const updateOrderDto = (
         await firstValueFrom(this.httpService.get(`${proxy}/${order.uid}`))
       ).data;
 
-      this.proxyIndex++;
-
       if (!updateOrderDto) {
-        this.logger.error(LogsTypes.ErrorOrderRequest, order.uid, { order });
         throw LogsTypes.ErrorOrderRequest;
       }
       return {
@@ -112,26 +105,22 @@ export class OrdersService {
         proxy,
       };
     } catch (error) {
-      this.logger.error(LogsTypes.ErrorOrderRequest, order.uid, { order });
+      return {
+        error,
+        proxy,
+      };
+    } finally {
+      this.proxyIndex++;
     }
   }
 
-  getLocaleOrderStatus(order: Order) {
-    return (
-      (order.statusName ? '' : this.i18n.t('order_empty')) +
-      this.i18n.t('order_status_beauty', {
-        order,
-        updateTime: OrdersService.getLocaleOrderUpdateTime(order),
-      })
-    );
-  }
-
   async create(createOrderDto: CreateOrderDto, user: User) {
-    if (
-      user.orders.filter((order) => !order.isDeleted).length >=
-      USER_MAX_COUNT_CODES
-    ) {
-      this.logger.error(LogsTypes.ErrorUserOrdersMaxCount, createOrderDto.uid, {
+    const activeOrdersCount = user.orders.reduce((count, order) => {
+      return order.isDeleted ? count : count + 1;
+    }, 0);
+
+    if (activeOrdersCount >= MAX_ORDERS_PER_USER) {
+      this.logger.error(LogsTypes.ErrorMaxOrdersPerUser, createOrderDto.uid, {
         user,
       });
       return null;
@@ -153,7 +142,7 @@ export class OrdersService {
 
     const newOrder = this.ordersRepository.create({
       uid: String(createOrderDto.uid),
-      shortUid: `*${createOrderDto.uid.slice(-CODE_UID_SHORT_LENGTH)}`,
+      shortUid: `*${createOrderDto.uid.slice(-ORDER_UID_SHORT_LENGTH)}`,
       receptionDate: OrdersService.parseReceptionDateFromUid(
         createOrderDto.uid,
       ),
@@ -166,15 +155,15 @@ export class OrdersService {
     this.logger.log(LogsTypes.DbOrderCreated, newOrder.uid, {
       order: newOrder,
     });
-    await this.createAuditLog(newOrder, user);
+    await this.createAuditLog(newOrder, user.id);
 
     return newOrder;
   }
 
-  async createAuditLog(newOrder: Order, user: User, oldOrder?: Order) {
+  async createAuditLog(newOrder: Order, userId: string, oldOrder?: Order) {
     const auditLog = this.ordersAuditLogRepository.create({
       orderUid: newOrder.uid,
-      userId: user.id,
+      userId,
       oldStatusId: oldOrder?.statusId,
       newStatusId: newOrder.statusId,
       oldStatusName: oldOrder?.statusName,
@@ -190,34 +179,61 @@ export class OrdersService {
     this.logger.log(LogsTypes.DbOrderAuditCreated, res.id);
   }
 
-  async update(existingOrder: Order, user: User) {
-    const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
-    const midpassResult = await this.getStatusFromMidpass(existingOrder);
-    const updateOrderDto = midpassResult.updateOrderDto;
+  async update(existingOrder: Order, userId: string) {
+    try {
+      const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
+      const midpassResult = await this.getStatusFromMidpass(existingOrder);
+      const updateOrderDto = midpassResult.updateOrderDto;
 
-    (existingOrder.sourceUid = updateOrderDto.sourceUid),
-      (existingOrder.receptionDate = updateOrderDto.receptionDate),
-      (existingOrder.statusId = updateOrderDto.passportStatus.passportStatusId),
-      (existingOrder.statusName = updateOrderDto.passportStatus.name),
-      (existingOrder.statusDescription =
-        updateOrderDto.passportStatus.description),
-      (existingOrder.statusColor = updateOrderDto.passportStatus.color),
-      (existingOrder.statusSubscription =
-        updateOrderDto.passportStatus.subscription),
-      (existingOrder.statusInternalName = updateOrderDto.internalStatus.name),
-      (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
-      (existingOrder.isDeleted = false),
-      await this.ordersRepository.save(existingOrder);
+      if (updateOrderDto) {
+        (existingOrder.sourceUid = updateOrderDto.sourceUid),
+          (existingOrder.receptionDate = updateOrderDto.receptionDate),
+          (existingOrder.statusId =
+            updateOrderDto.passportStatus.passportStatusId),
+          (existingOrder.statusName = updateOrderDto.passportStatus.name),
+          (existingOrder.statusDescription =
+            updateOrderDto.passportStatus.description),
+          (existingOrder.statusColor = updateOrderDto.passportStatus.color),
+          (existingOrder.statusSubscription =
+            updateOrderDto.passportStatus.subscription),
+          (existingOrder.statusInternalName =
+            updateOrderDto.internalStatus.name),
+          (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
+          (existingOrder.isDeleted = false),
+          await this.ordersRepository.save(existingOrder);
 
-    this.logger.log(LogsTypes.DbOrderUpdated, existingOrder.uid, {
-      order: existingOrder,
+        this.logger.log(LogsTypes.DbOrderUpdated, existingOrder.uid, {
+          order: existingOrder,
+        });
+        await this.createAuditLog(existingOrder, userId, oldOrder);
+      } else {
+        throw {
+          error: existingOrder.uid,
+          proxy: midpassResult.proxy,
+        };
+      }
+
+      return {
+        order: existingOrder,
+        proxy: midpassResult.proxy,
+      };
+    } catch (e) {
+      this.logger.error(LogsTypes.ErrorOrderRequest, e.error);
+      return {
+        error: e.error,
+        proxy: e.proxy,
+      };
+    }
+  }
+
+  async getAll() {
+    return await this.ordersRepository.find();
+  }
+
+  async getAllFiltered() {
+    return await this.ordersRepository.findBy({
+      isDeleted: false,
     });
-    await this.createAuditLog(existingOrder, user, oldOrder);
-
-    return {
-      order: existingOrder,
-      proxy: midpassResult.proxy,
-    };
   }
 
   async delete(uid: string, user: User) {
@@ -237,7 +253,7 @@ export class OrdersService {
       await this.ordersRepository.save(existingOrder);
 
       this.logger.log(LogsTypes.DbOrderDeleted, existingOrder.uid, { user });
-      await this.createAuditLog(existingOrder, user);
+      await this.createAuditLog(existingOrder, user.id);
 
       return existingOrder;
     } else {
@@ -260,7 +276,7 @@ export class OrdersService {
 
       for (const order of existingOrders) {
         this.logger.log(LogsTypes.DbOrderDeleted, order.uid, { user });
-        await this.createAuditLog(order, user);
+        await this.createAuditLog(order, user.id);
       }
 
       return existingOrders;

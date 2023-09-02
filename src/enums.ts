@@ -1,22 +1,30 @@
+export enum AutoupdateSchedules {
+  Weekdays = '23 9,12,15,18,21 * * 1-5',
+  Weekends = '17 16,20 * * 0,6',
+  // b = '*/10 * * * * *',
+}
+
 export enum Timeouts {
   Start = 1000 * 2,
   Text = 1000 * 2,
-  CronjobNextUserCode = 1000 * 10,
+  CronjobNextOrder = 1000 * 1,
   CronjobNextUser = 1000 * 10,
   GerUsers = 100,
 }
 
 export enum LogsTypes {
   Error = 'ERROR',
-  ErrorCronjobRoot = 'ERROR_CRONJOB_ROOT',
-  ErrorCronjobUserOrder = 'ERROR_CRONJOB_USER_ORDER',
+  ErrorAutoupdateRoot = 'ERROR_AUTOUPDATE_ROOT',
+  ErrorAutoupdateOrder = 'ERROR_AUTOUPDATE_ORDER',
   ErrorBlockByUser = 'ERROR_BLOCK_BY_USER',
   ErrorUserNotFound = 'ERROR_USER_NOT_FOUND',
   ErrorUserNotAllowedToUpdateOrder = 'ERROR_USER_NOT_ALLOWED_TO_UPDATE_ORDER',
   ErrorOrderRequest = 'ERROR_ORDER_REQUEST',
+  ErrorOrderValidate = 'ERROR_ORDER_VALIDATE',
+  ErrorOrderDelete = 'ERROR_ORDER_DELETE',
   ErrorOrderNotFound = 'ERROR_ORDER_NOT_FOUND',
   ErrorOrdersNotFound = 'ERROR_ORDERS_NOT_FOUND',
-  ErrorUserOrdersMaxCount = 'ERROR_USER_ORDERS_MAX_COUNT',
+  ErrorMaxOrdersPerUser = 'ERROR_MAX_ORDERS_PER_USER',
 
   DbUserCreated = 'DB_USER_CREATED',
   DbOrderCreated = 'DB_ORDER_CREATED',
@@ -26,21 +34,18 @@ export enum LogsTypes {
 
   TgBotStart = 'TG_BOT_START',
   TgUserStart = 'TG_USER_START',
+  TgUserUnsubscribed = 'TG_USER_UNSUBSCRIBED',
+  TgUserSubscribed = 'TG_USER_SUBSCRIBED',
+  TgUserSubscribedAlready = 'TG_USER_SUBSCRIBED_ALREADY',
+  TgUserOrderStatus = 'TG_USER_ORDER_STATUS',
+  TgUserFaqBase = 'TG_USER_FAQ_BASE',
+  TgUserFaqStatuses = 'TG_USER_FAQ_STATUSES',
+  TgUserSchedule = 'TG_USER_SCHEDULE',
 
-  // TODO: сделать под единый стиль
-  SuccessStart = 'SUCCESS_START',
-  StartCronjob = 'START_CRONJOB',
-  EndCronjob = 'END_CRONJOB',
-  AutoupdateWithoutChanges = 'AUTOUPDATE_WITHOUT_CHANGES',
-  AutoupdateWithChanges = 'AUTOUPDATE_WITH_CHANGES',
-  SubscribeEnable = 'SUBSCRIBE_ENABLE',
-  SubscribeEnableAlready = 'SUBSCRIBE_ENABLE_ALREADY',
-  UnsubscribeEnable = 'UNSUBSCRIBE_ENABLE',
-  SuccessCodeStatus = 'SUCCESS_CODE_STATUS',
-  ShowSchedule = 'SHOW_SCHEDULE',
-  ShowFAQ = 'SHOW_FAQ',
-  Message = 'MESSAGE',
-  BotStart = 'BOT_START',
+  AutoupdateStart = 'AUTOUPDATE_START',
+  AutoupdateOrderChanged = 'AUTOUPDATE_ORDER_CHANGED',
+  AutoupdateOrderWithoutChanges = 'AUTOUPDATE_ORDER_WITHOUT_CHANGES',
+  AutoupdateEnd = 'AUTOUPDATE_END',
 }
 
 export enum TextCommands {
@@ -55,7 +60,8 @@ export enum TextCommands {
   Help3 = 'помощь',
   Help4 = '/помощь',
 
-  Faq = 'faq',
+  FaqBase = 'faq',
+  FaqStatuses = 'статусы',
   Schedule = 'расписание',
 
   Unsubscribe = 'отписаться',

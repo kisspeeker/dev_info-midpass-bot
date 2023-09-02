@@ -7,17 +7,24 @@ export function declOfNum(number: number, titles: string[]) {
   ];
 }
 
-export function calculateTimeDifference(
-  startDate: Date | string,
-  endDate = new Date(),
-) {
-  const diffInMilliseconds = +endDate - +new Date(startDate);
+export function getLocaleDateString(date: string | Date) {
+  return new Date(date).toLocaleString('ru-RU', {
+    timeStyle: 'medium',
+    dateStyle: 'short',
+    timeZone: 'Europe/Moscow',
+  });
+}
 
-  const hours = Math.floor(diffInMilliseconds / 3600000);
-  const minutes = Math.floor((diffInMilliseconds % 3600000) / 60000);
-  const seconds = Math.floor((diffInMilliseconds % 60000) / 1000);
+export function calculateTimeDifference(startDate, endDate = new Date()) {
+  const diffInMilliseconds = +endDate - +startDate;
+  const diffDate = new Date(diffInMilliseconds);
 
-  return `${hours}:${minutes}:${seconds}`;
+  return diffDate.toLocaleString('ru-RU', {
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 export function calculateDaysDifference(
@@ -28,4 +35,13 @@ export function calculateDaysDifference(
   const diffInDays = Math.floor(diffInMilliseconds / (24 * 60 * 60 * 1000));
 
   return diffInDays;
+}
+
+export function isValidDate(checkingDate: string | Date) {
+  const date = new Date(checkingDate);
+  return !isNaN(+date) && date instanceof Date;
+}
+
+export async function sleep(delay: number = 100) {
+  await new Promise((resolve) => setTimeout(resolve, delay));
 }

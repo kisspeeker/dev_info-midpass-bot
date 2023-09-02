@@ -31,4 +31,8 @@ export class User {
 
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
+
+  get filteredOrders() {
+    return this.orders.filter((order) => !order.isDeleted);
+  }
 }

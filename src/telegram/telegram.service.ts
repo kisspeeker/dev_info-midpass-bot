@@ -2,14 +2,27 @@ import { Injectable } from '@nestjs/common';
 import { Context, Markup, NarrowedContext, Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 
-import { LogsTypes, TextCommands } from 'src/enums';
+import {
+  AutoupdateSchedules,
+  LogsTypes,
+  TextCommands,
+  Timeouts,
+} from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 import { OrdersService } from 'src/orders/orders.service';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entity/user.entity';
-import { Message, Update } from 'telegraf/typings/core/types/typegram';
+import {
+  CallbackQuery,
+  Message,
+  Update,
+} from 'telegraf/typings/core/types/typegram';
 import { Order } from 'src/orders/entity/order.entity';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
+import { calculateTimeDifference, sleep } from 'src/utils';
+import { API_ROUTE_MIDPASS_PROXIES } from 'src/constants';
 
 type TgContext = NarrowedContext<
   Context<Update>,
@@ -19,39 +32,108 @@ type TgContext = NarrowedContext<
   }
 >;
 
+type TgContextAction = NarrowedContext<
+  Context<Update> & {
+    message: Update.New & Update.NonChannel & Message.TextMessage;
+    match: RegExpExecArray;
+  },
+  Update.CallbackQueryUpdate<CallbackQuery>
+>;
+
+type AutoupdateCounter = {
+  ordersAll: number;
+  usersChecked: number;
+  ordersChecked: number;
+  ordersUpdated: number;
+  ordersError: number;
+  routes: Record<string, number>;
+  usersCheckedList: string[];
+  duration: string;
+};
+
+enum TgEvents {
+  Start = 'Start',
+  Text = 'Text',
+  Action = 'Action',
+}
+
 @Injectable()
 export class TelegramService {
   private bot: Telegraf;
   private adminId: string = process.env.TG_ADMIN_ID;
+  private isUnderConstruction: boolean =
+    process.env.IS_UNDER_CONSTRUCTION === 'true';
 
   constructor(
     private readonly usersService: UsersService,
     private readonly ordersService: OrdersService,
     private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
+    private schedulerRegistry: SchedulerRegistry,
   ) {
     this.bot = new Telegraf(process.env.TG_BOT_TOKEN);
     this.initBot();
+    this.initCronjobs();
+  }
+
+  private async handleUserEvent(
+    ctx: TgContext | TgContextAction,
+    eventName: TgEvents,
+  ) {
+    if (await this.handleCheckUnderConstruction(ctx)) {
+      return;
+    }
+    const user = await this.usersService.find(ctx.from);
+
+    switch (eventName) {
+      case TgEvents.Start:
+        this.handleUserStart(ctx as TgContext, user);
+        break;
+      case TgEvents.Action:
+        this.handleUserActionUnsubscribe(ctx as TgContextAction, user);
+        break;
+      case TgEvents.Text:
+        this.handleUserText(ctx as TgContext, user);
+        break;
+      default:
+        this.handleUserText(ctx as TgContext, user);
+        break;
+    }
   }
 
   private initBot() {
-    this.bot.start((ctx: TgContext) => this.handleUserStart(ctx));
+    this.bot.start(async (ctx: TgContext) => {
+      this.handleUserEvent(ctx, TgEvents.Start);
+    });
 
-    this.bot.on(message('text'), (ctx: TgContext) => this.handleUserText(ctx));
+    this.bot.on(message('text'), async (ctx: TgContext) => {
+      this.handleUserEvent(ctx, TgEvents.Text);
+    });
+
+    this.bot.action(/unsubscribe (.+)/, async (ctx: TgContextAction) => {
+      this.handleUserEvent(ctx, TgEvents.Action);
+    });
 
     this.bot.catch((e) => {
       this.logger.error(LogsTypes.Error, '=== BOT CATCH ===', { error: e });
     });
   }
 
-  private async handleUserStart(ctx: TgContext, currentUser?: User) {
-    const user = currentUser || (await this.usersService.create(ctx.from));
-    await this.sendMessage(user, this.i18n.t('user.message_start'));
-    this.logger.log(LogsTypes.TgUserStart, user.id);
+  private initCronjobs() {
+    Object.keys(AutoupdateSchedules).forEach((name) => {
+      const job = new CronJob(
+        AutoupdateSchedules[name],
+        async () => await this.handleAutoupdateOrders(),
+        null,
+        true,
+        'Europe/Moscow',
+      );
+      this.schedulerRegistry.addCronJob(name, job);
+      this.schedulerRegistry.getCronJob(name).start();
+    });
   }
 
-  private async handleUserText(ctx: TgContext) {
-    const user = await this.usersService.find(ctx.from);
+  private async handleUserText(ctx: TgContext, user: User) {
     const text = String(ctx.message.text).toLowerCase();
     const textCommand = String(text.split(' ')[0]).trim();
 
@@ -66,8 +148,11 @@ export class TelegramService {
         case TextCommands.Help4:
           this.handleUserStart(ctx, user);
           break;
-        case TextCommands.Faq:
-          this.handleUserFaq(ctx, user);
+        case TextCommands.FaqBase:
+          this.handleUserFaqBase(ctx, user);
+          break;
+        case TextCommands.FaqStatuses:
+          this.handleUserFaqStatuses(ctx, user);
           break;
         case TextCommands.Schedule:
           this.handleUserSchedule(ctx, user);
@@ -101,12 +186,118 @@ export class TelegramService {
     }
   }
 
-  private async handleUserFaq(ctx: TgContext, user: User) {
+  private async handleAutoupdateOrders() {
+    const startDate = new Date();
+    const counter = this.initAutoupdateCounter();
+    this.logger.log(LogsTypes.AutoupdateStart, `${startDate}`);
+
+    try {
+      const orders = await this.ordersService.getAllFiltered();
+      counter.ordersAll = orders.length;
+
+      for (const order of orders) {
+        await this.processOrder(order, counter);
+        await sleep(Timeouts.CronjobNextOrder);
+      }
+
+      counter.usersChecked = [...new Set(counter.usersCheckedList)].length;
+      counter.duration = calculateTimeDifference(startDate);
+    } catch (e) {
+      this.logger.error(LogsTypes.ErrorAutoupdateRoot, e);
+    } finally {
+      this.logger.log(LogsTypes.AutoupdateEnd, `${new Date()}`, { counter });
+    }
+  }
+
+  private initAutoupdateCounter(): AutoupdateCounter {
+    return {
+      ordersAll: 0,
+      usersChecked: 0,
+      ordersChecked: 0,
+      ordersUpdated: 0,
+      ordersError: 0,
+      routes: API_ROUTE_MIDPASS_PROXIES.reduce((acc, curr) => {
+        acc[curr] = 0;
+        return acc;
+      }, {}),
+      usersCheckedList: [],
+      duration: '',
+    };
+  }
+
+  private async processOrder(order: Order, counter: AutoupdateCounter) {
+    try {
+      if (OrdersService.isCompleteOrder(order)) {
+        return;
+      }
+      counter.ordersChecked++;
+      counter.usersCheckedList.push(order.userId);
+
+      const midpassResult = await this.ordersService.update(
+        order,
+        order.userId,
+      );
+
+      if (midpassResult.error) {
+        counter.routes[midpassResult.proxy]++;
+        throw `handleAutoupdateOrders processOrder ${midpassResult.error}`;
+      }
+
+      counter.routes[midpassResult.proxy] =
+        (counter.routes[midpassResult.proxy] || 0) + 1;
+
+      const hasChanges = OrdersService.hasChangesWith(
+        order,
+        midpassResult.order,
+      );
+
+      if (hasChanges) {
+        const user = await this.usersService.find({ id: order.userId });
+        counter.ordersUpdated++;
+        await this.sendMessageStatus(user, midpassResult.order);
+        this.logger.log(LogsTypes.AutoupdateOrderChanged, user.id, { order });
+        return;
+      }
+      this.logger.log(LogsTypes.AutoupdateOrderWithoutChanges, order.userId, {
+        order,
+      });
+    } catch (e) {
+      counter.ordersError++;
+      this.logger.error(LogsTypes.ErrorAutoupdateOrder, e, { order });
+    }
+  }
+
+  private async handleCheckUnderConstruction(ctx: TgContext | TgContextAction) {
+    if (this.isUnderConstruction) {
+      await this.bot.telegram.sendMessage(
+        ctx.from.id,
+        this.i18n.t('user.message_donate'),
+        {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        },
+      );
+    }
+    return this.isUnderConstruction;
+  }
+
+  private async handleUserStart(ctx: TgContext, user: User) {
+    this.logger.log(LogsTypes.TgUserStart, user.id);
+    await this.sendMessage(user, this.i18n.t('user.message_start'));
+  }
+
+  private async handleUserFaqBase(ctx: TgContext, user: User) {
+    this.logger.log(LogsTypes.TgUserFaqBase, user.id);
     await this.sendMessage(user, this.i18n.t('user.message_faq_base'));
+  }
+
+  private async handleUserFaqStatuses(ctx: TgContext, user: User) {
+    this.logger.log(LogsTypes.TgUserFaqStatuses, user.id);
     await this.sendMessage(user, this.i18n.t('user.message_faq_statuses'));
   }
 
   private async handleUserSchedule(ctx: TgContext, user: User) {
+    this.logger.log(LogsTypes.TgUserSchedule, user.id);
     await this.sendMessage(
       user,
       this.i18n.t('user.message_autoupdate_schedules'),
@@ -114,27 +305,55 @@ export class TelegramService {
   }
 
   private async handleUserUnsubscribe(ctx: TgContext, user: User) {
-    console.warn('handleUserUnsubscribe');
+    await this.sendMessageInline(user);
+  }
+
+  private async handleUserActionUnsubscribe(ctx: TgContextAction, user: User) {
+    const uid = ctx.match[1];
+
+    const deletedOrder = await this.ordersService.delete(uid, user);
+    if (deletedOrder) {
+      this.logger.log(LogsTypes.TgUserUnsubscribed, user.id, {
+        order: deletedOrder,
+      });
+      const updatedUser = await this.usersService.find(ctx.from);
+      await this.sendMessage(
+        updatedUser,
+        this.i18n.t('user.message_unsubscribe_success', {
+          order: deletedOrder,
+        }),
+      );
+      return;
+    }
+    this.logger.error(LogsTypes.ErrorOrderDelete, uid);
   }
 
   private async handleUserSubscribe(ctx: TgContext, user: User) {
     const uid = String(ctx.message.text.split(' ')[0]).trim();
-    const existingOrder = user.orders.find((order) => order.uid === uid);
+    const existingOrder = user.filteredOrders.find(
+      (order) => order.uid === uid,
+    );
 
     if (existingOrder) {
+      this.logger.log(LogsTypes.TgUserSubscribedAlready, user.id, {
+        order: existingOrder,
+      });
       await this.sendMessageStatus(user, existingOrder, 'subscribedAlready');
       return;
     }
 
     const order = await this.ordersService.create({ uid }, user);
+    const updatedUser = await this.usersService.find(ctx.from);
 
     if (order) {
-      await this.sendMessageStatus(user, order, 'subscribed');
+      this.logger.log(LogsTypes.TgUserSubscribed, updatedUser.id, { order });
+      await this.sendMessageStatus(updatedUser, order, 'subscribed');
       return;
     }
 
+    this.logger.log(LogsTypes.ErrorOrderValidate, updatedUser.id, { order });
     await this.sendMessage(
-      user,
+      updatedUser,
       this.i18n.t('user_errors.message_order_validate'),
     );
   }
@@ -143,13 +362,17 @@ export class TelegramService {
     const uid = String(ctx.message.text.split(' ')[1]).trim();
 
     if (OrdersService.isValidUid(uid) || OrdersService.isValidUidShort(uid)) {
-      const existingOrder = user.orders.find(
+      const existingOrder = user.filteredOrders.find(
         (order) => order.uid === uid || order.shortUid === uid,
       );
 
       if (existingOrder) {
+        this.logger.log(LogsTypes.TgUserOrderStatus, user.id, {
+          order: existingOrder,
+        });
         await this.sendMessageStatus(user, existingOrder);
       } else {
+        this.logger.error(LogsTypes.ErrorOrderNotFound, uid, { user });
         await this.sendMessage(
           user,
           this.i18n.t('user_errors.message_order_not_found'),
@@ -158,6 +381,7 @@ export class TelegramService {
       return;
     }
 
+    this.logger.log(LogsTypes.ErrorOrderValidate, uid, { user });
     await this.sendMessage(
       user,
       this.i18n.t('user_errors.message_order_validate'),
@@ -180,14 +404,15 @@ export class TelegramService {
 
   private useKeyboardDefault(user: User) {
     const res = [
+      [Markup.button.text(this.i18n.t('user.button_faq_base'))],
       [
-        Markup.button.text(this.i18n.t('user.button_faq')),
         Markup.button.text(this.i18n.t('user.button_schedule')),
+        Markup.button.text(this.i18n.t('user.button_faq_statuses')),
       ],
     ];
 
-    if (user && user.orders.length) {
-      user.orders.forEach((order) =>
+    if (user && user.filteredOrders.length) {
+      user.filteredOrders.forEach((order) =>
         res.push([
           Markup.button.text(
             this.i18n.t('user.button_status_order', { order }),
@@ -201,8 +426,8 @@ export class TelegramService {
 
   private useKeyboardInlineUnsubscribe = (user: User) => {
     const res = [];
-    if (user && user.orders.length) {
-      user.orders.forEach((order) =>
+    if (user && user.filteredOrders.length) {
+      user.filteredOrders.forEach((order) =>
         res.push([
           Markup.button.callback(
             this.i18n.t('user.button_unsubscribe_order', { order }),
@@ -229,12 +454,16 @@ export class TelegramService {
     });
   }
 
-  private async sendMessageInline(user: User, message: string) {
-    await this.bot.telegram.sendMessage(user.id, message, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-      ...this.useKeyboardInlineUnsubscribe(user),
-    });
+  private async sendMessageInline(user: User) {
+    await this.bot.telegram.sendMessage(
+      user.id,
+      this.i18n.t('user.message_unsubscribe'),
+      {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        ...this.useKeyboardInlineUnsubscribe(user),
+      },
+    );
   }
 
   private async sendMessageStatus(
@@ -247,28 +476,20 @@ export class TelegramService {
       order,
     });
     const donate = this.i18n.t('user.message_donate');
-    let message = '';
-
-    if (!order.statusPercent) {
-      message = this.i18n.t('user.message_order_empty');
-    }
+    let message = this.i18n.t('user.message_order_empty');
 
     if (type === 'changed') {
-      message =
-        this.i18n.t('user.message_order_changed') +
-        message +
-        orderBeauty +
-        donate;
+      message = this.i18n.t('user.message_order_changed');
     } else if (type === 'subscribed') {
-      message =
-        this.i18n.t('user.message_order_subscribed') + message + orderBeauty;
+      message = this.i18n.t('user.message_order_subscribed');
     } else if (type === 'subscribedAlready') {
-      message =
-        this.i18n.t('user.message_order_subscribed_already') +
-        message +
-        orderBeauty;
-    } else {
-      message = message + orderBeauty;
+      message = this.i18n.t('user.message_order_subscribed_already');
+    }
+
+    message += orderBeauty;
+
+    if (type === 'changed') {
+      message += donate;
     }
 
     await this.bot.telegram.sendPhoto(
@@ -285,8 +506,13 @@ export class TelegramService {
   }
 
   async startBot() {
-    const usersCount = (await this.usersService.findAllWithOrders()).length;
-    this.logger.log(LogsTypes.TgBotStart, `UsersWithOrders: ${usersCount}`);
-    this.bot.launch();
+    if (this.isUnderConstruction) {
+      this.logger.log(LogsTypes.TgBotStart, 'isUnderConstruction');
+      this.bot.launch();
+    } else {
+      const usersCount = (await this.usersService.findAllWithOrders()).length;
+      this.logger.log(LogsTypes.TgBotStart, `UsersWithOrders: ${usersCount}`);
+      this.bot.launch();
+    }
   }
 }

@@ -5,6 +5,7 @@ import { TelegramService } from './telegram/telegram.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const telegramService = app.get(TelegramService);
-  telegramService.startBot();
+  await telegramService.startBot();
+  app.init();
 }
 bootstrap();
