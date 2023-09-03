@@ -2,13 +2,21 @@ import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 
 import { TelegramService } from 'src/telegram/telegram.service';
-import { UsersService } from 'src/users/users.service';
 import { UsersModule } from 'src/users/users.module';
 import { OrdersModule } from 'src/orders/orders.module';
-import { OrdersService } from 'src/orders/orders.service';
+import { MessageModule } from 'src/message/message.module';
+import { BotModule } from 'src/bot/bot.module';
+import { AutoupdateModule } from 'src/autoupdate/autoupdate.module';
 
 @Module({
-  imports: [UsersModule, OrdersModule, HttpModule],
-  providers: [TelegramService, UsersService, OrdersService],
+  imports: [
+    BotModule,
+    UsersModule,
+    OrdersModule,
+    MessageModule,
+    AutoupdateModule,
+    HttpModule,
+  ],
+  providers: [TelegramService],
 })
 export class TelegramModule {}
