@@ -4,6 +4,7 @@ import { message } from 'telegraf/filters';
 
 import {
   AutoupdateSchedules,
+  BotCommands,
   LogsTypes,
   TextCommands,
   Timeouts,
@@ -57,6 +58,33 @@ enum TgEvents {
   Action = 'Action',
 }
 
+const botCommands = [
+  {
+    command: BotCommands.Start,
+    description: 'Команда для старта',
+  },
+  {
+    command: BotCommands.Help,
+    description: 'Как пользоваться ботом',
+  },
+  {
+    command: BotCommands.FaqBase,
+    description: 'Как пользоваться ботом',
+  },
+  {
+    command: BotCommands.FaqStatuses,
+    description: 'Значения статусов заявлений',
+  },
+  {
+    command: BotCommands.Schedule,
+    description: 'Расписание автообновления заявлений',
+  },
+  {
+    command: BotCommands.Contacts,
+    description: 'Контакты автора для вопросов и предложений',
+  },
+];
+
 @Injectable()
 export class TelegramService {
   private bot: Telegraf;
@@ -73,12 +101,12 @@ export class TelegramService {
   ) {
     this.bot = new Telegraf(process.env.TG_BOT_TOKEN);
     this.initBot();
-    this.initCronjobs();
+    // this.initCronjobs();
   }
 
   private async handleUserEvent(
     ctx: TgContext | TgContextAction,
-    eventName: TgEvents,
+    eventName: TgEvents | BotCommands,
   ) {
     if (await this.handleCheckUnderConstruction(ctx)) {
       return;
@@ -87,16 +115,30 @@ export class TelegramService {
 
     switch (eventName) {
       case TgEvents.Start:
-        this.handleUserStart(ctx as TgContext, user);
+      case BotCommands.Start:
+        await this.handleUserStart(ctx as TgContext, user);
+        break;
+      case BotCommands.Help:
+      case BotCommands.FaqBase:
+        await this.handleUserFaqBase(ctx as TgContext, user);
+        break;
+      case BotCommands.FaqStatuses:
+        await this.handleUserFaqStatuses(ctx as TgContext, user);
+        break;
+      case BotCommands.Contacts:
+        await this.handleUserContacts(ctx as TgContext, user);
+        break;
+      case BotCommands.Schedule:
+        await this.handleUserSchedule(ctx as TgContext, user);
         break;
       case TgEvents.Action:
-        this.handleUserActionUnsubscribe(ctx as TgContextAction, user);
+        await this.handleUserActionUnsubscribe(ctx as TgContextAction, user);
         break;
       case TgEvents.Text:
-        this.handleUserText(ctx as TgContext, user);
+        await this.handleUserText(ctx as TgContext, user);
         break;
       default:
-        this.handleUserText(ctx as TgContext, user);
+        await this.handleUserText(ctx as TgContext, user);
         break;
     }
   }
@@ -105,6 +147,12 @@ export class TelegramService {
     this.bot.start(async (ctx: TgContext) => {
       this.handleUserEvent(ctx, TgEvents.Start);
     });
+
+    for (const command of botCommands) {
+      this.bot.command(command.command, (ctx: TgContext) => {
+        this.handleUserEvent(ctx, command.command);
+      });
+    }
 
     this.bot.on(message('text'), async (ctx: TgContext) => {
       this.handleUserEvent(ctx, TgEvents.Text);
@@ -139,24 +187,6 @@ export class TelegramService {
 
     try {
       switch (textCommand) {
-        case TextCommands.Start1:
-        case TextCommands.Start2:
-        case TextCommands.Start3:
-        case TextCommands.Help1:
-        case TextCommands.Help2:
-        case TextCommands.Help3:
-        case TextCommands.Help4:
-          this.handleUserStart(ctx, user);
-          break;
-        case TextCommands.FaqBase:
-          this.handleUserFaqBase(ctx, user);
-          break;
-        case TextCommands.FaqStatuses:
-          this.handleUserFaqStatuses(ctx, user);
-          break;
-        case TextCommands.Schedule:
-          this.handleUserSchedule(ctx, user);
-          break;
         case TextCommands.Unsubscribe:
           this.handleUserUnsubscribe(ctx, user);
           break;
@@ -296,6 +326,14 @@ export class TelegramService {
     await this.sendMessage(user, this.i18n.t('user.message_faq_statuses'));
   }
 
+  private async handleUserContacts(ctx: TgContext, user: User) {
+    this.logger.log(LogsTypes.TgUserContacts, user.id);
+    await this.sendMessage(
+      user,
+      this.i18n.t('user.message_contacts') + this.i18n.t('user.message_donate'),
+    );
+  }
+
   private async handleUserSchedule(ctx: TgContext, user: User) {
     this.logger.log(LogsTypes.TgUserSchedule, user.id);
     await this.sendMessage(
@@ -317,12 +355,20 @@ export class TelegramService {
         order: deletedOrder,
       });
       const updatedUser = await this.usersService.find(ctx.from);
+      const messageId = ctx.update.callback_query.message.message_id;
+
+      console.warn('updatedUser', updatedUser);
+
       await this.sendMessage(
         updatedUser,
         this.i18n.t('user.message_unsubscribe_success', {
           order: deletedOrder,
         }),
       );
+
+      if (messageId) {
+        await this.bot.telegram.deleteMessage(user.id, messageId);
+      }
       return;
     }
     this.logger.error(LogsTypes.ErrorOrderDelete, uid);
@@ -403,15 +449,9 @@ export class TelegramService {
   }
 
   private useKeyboardDefault(user: User) {
-    const res = [
-      [Markup.button.text(this.i18n.t('user.button_faq_base'))],
-      [
-        Markup.button.text(this.i18n.t('user.button_schedule')),
-        Markup.button.text(this.i18n.t('user.button_faq_statuses')),
-      ],
-    ];
+    const res = [];
 
-    if (user && user.filteredOrders.length) {
+    if (user) {
       user.filteredOrders.forEach((order) =>
         res.push([
           Markup.button.text(
@@ -419,9 +459,11 @@ export class TelegramService {
           ),
         ]),
       );
-      res.push([Markup.button.text(this.i18n.t('user.button_unsubscribe'))]);
+      if (user.filteredOrders.length) {
+        res.push([Markup.button.text(this.i18n.t('user.button_unsubscribe'))]);
+      }
     }
-    return res.length ? Markup.keyboard(res).resize() : [];
+    return res.length ? Markup.keyboard(res).resize() : Markup.removeKeyboard();
   }
 
   private useKeyboardInlineUnsubscribe = (user: User) => {
@@ -512,7 +554,8 @@ export class TelegramService {
     } else {
       const usersCount = (await this.usersService.findAllWithOrders()).length;
       this.logger.log(LogsTypes.TgBotStart, `UsersWithOrders: ${usersCount}`);
-      this.bot.launch();
+      await this.bot.telegram.setMyCommands(botCommands);
+      await this.bot.launch();
     }
   }
 }

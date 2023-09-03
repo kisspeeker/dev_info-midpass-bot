@@ -123,7 +123,7 @@ export class OrdersService {
       this.logger.error(LogsTypes.ErrorMaxOrdersPerUser, createOrderDto.uid, {
         user,
       });
-      return null;
+      throw LogsTypes.ErrorMaxOrdersPerUser;
     }
 
     const existingOrder = await this.ordersRepository.findOneBy({
@@ -137,7 +137,7 @@ export class OrdersService {
         createOrderDto.uid,
         { user },
       );
-      return null;
+      throw LogsTypes.ErrorUserNotAllowedToUpdateOrder;
     }
 
     const newOrder = this.ordersRepository.create({

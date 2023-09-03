@@ -41,6 +41,7 @@ export enum LogsTypes {
   TgUserFaqBase = 'TG_USER_FAQ_BASE',
   TgUserFaqStatuses = 'TG_USER_FAQ_STATUSES',
   TgUserSchedule = 'TG_USER_SCHEDULE',
+  TgUserContacts = 'TG_USER_CONTACTS',
 
   AutoupdateStart = 'AUTOUPDATE_START',
   AutoupdateOrderChanged = 'AUTOUPDATE_ORDER_CHANGED',
@@ -52,19 +53,16 @@ export enum TextCommands {
   AdminSend = 'написать',
   AdminTest = 'test',
 
-  Start1 = 'start',
-  Start2 = 'старт',
-  Start3 = 'начать',
-  Help1 = 'help',
-  Help2 = '/help',
-  Help3 = 'помощь',
-  Help4 = '/помощь',
-
-  FaqBase = 'faq',
-  FaqStatuses = 'статусы',
-  Schedule = 'расписание',
-
   Unsubscribe = 'отписаться',
   Status = 'статус',
   StatusUpdate = 'обновить',
+}
+
+export enum BotCommands {
+  Start = 'start',
+  Help = 'help',
+  FaqBase = 'faq',
+  FaqStatuses = 'statuses',
+  Schedule = 'schedule',
+  Contacts = 'contacts',
 }
