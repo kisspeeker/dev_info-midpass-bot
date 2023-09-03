@@ -1,11 +1,12 @@
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fs = require('fs');
+
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { HttpService } from '@nestjs/axios';
 import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { resolve } from 'path';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const fs = require('fs');
 
 import {
   API_ROUTE_MIDPASS_PROXIES,
@@ -21,7 +22,11 @@ import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
 import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
-import { getLocaleDateString, isValidDate } from 'src/utils';
+import { isValidDate } from 'src/utils';
+import {
+  AppResponse,
+  AppResponseService,
+} from 'src/app-response/app-response.service';
 
 @Injectable()
 export class OrdersService {
@@ -35,6 +40,7 @@ export class OrdersService {
     private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
     private readonly httpService: HttpService,
+    private readonly appResponseService: AppResponseService,
   ) {}
 
   static isValidUid(uid = '') {
@@ -73,20 +79,26 @@ export class OrdersService {
   }
 
   static async getStatusImage(order: Order) {
-    const statusImagePath = resolve(
-      `./public/images/${order.statusPercent}.png`,
-    );
-    if (fs.existsSync(statusImagePath)) {
-      return fs.createReadStream(statusImagePath);
+    try {
+      const statusImagePath = resolve(
+        `./public/images/${order.statusPercent}.png`,
+      );
+      if (fs.existsSync(statusImagePath)) {
+        return fs.createReadStream(statusImagePath);
+      }
+      return fs.createReadStream(resolve('./public/images/fallback.png'));
+    } catch (e) {
+      console.error(e);
+      throw e;
     }
-    return fs.createReadStream(resolve('./public/images/fallback.png'));
   }
 
-  private async getStatusFromMidpass(order: Order): Promise<{
-    proxy: string;
-    updateOrderDto?: UpdateOrderDto;
-    error?: unknown;
-  }> {
+  private async getStatusFromMidpass(order: Order): Promise<
+    AppResponse<{
+      proxy: string;
+      updateOrderDto?: UpdateOrderDto;
+    }>
+  > {
     const proxy =
       API_ROUTE_MIDPASS_PROXIES[
         this.proxyIndex % API_ROUTE_MIDPASS_PROXIES.length
@@ -100,90 +112,102 @@ export class OrdersService {
       if (!updateOrderDto) {
         throw LogsTypes.ErrorOrderRequest;
       }
-      return {
+      return this.appResponseService.success({
         updateOrderDto,
         proxy,
-      };
+      });
     } catch (error) {
-      return {
-        error,
+      return this.appResponseService.error(LogsTypes.ErrorOrderRequest, error, {
         proxy,
-      };
+      });
     } finally {
       this.proxyIndex++;
     }
   }
 
   async create(createOrderDto: CreateOrderDto, user: User) {
-    const activeOrdersCount = user.orders.reduce((count, order) => {
-      return order.isDeleted ? count : count + 1;
-    }, 0);
+    try {
+      const activeOrdersCount = user.orders.reduce((count, order) => {
+        return order.isDeleted ? count : count + 1;
+      }, 0);
 
-    if (activeOrdersCount >= MAX_ORDERS_PER_USER) {
-      this.logger.error(LogsTypes.ErrorMaxOrdersPerUser, createOrderDto.uid, {
+      if (activeOrdersCount >= MAX_ORDERS_PER_USER) {
+        throw {
+          type: LogsTypes.ErrorMaxOrdersPerUser,
+          message: createOrderDto.uid,
+          meta: { user },
+        };
+      }
+
+      const existingOrder = await this.ordersRepository.findOneBy({
+        uid: createOrderDto.uid,
+        isDeleted: false,
+      });
+
+      if (existingOrder && existingOrder.userId !== user.id) {
+        throw {
+          type: LogsTypes.ErrorUserNotAllowedToUpdateOrder,
+          message: createOrderDto.uid,
+          meta: { user },
+        };
+      }
+
+      const newOrder = this.ordersRepository.create({
+        uid: String(createOrderDto.uid),
+        shortUid: `*${createOrderDto.uid.slice(-ORDER_UID_SHORT_LENGTH)}`,
+        receptionDate: OrdersService.parseReceptionDateFromUid(
+          createOrderDto.uid,
+        ),
+        isDeleted: false,
         user,
       });
-      throw LogsTypes.ErrorMaxOrdersPerUser;
-    }
 
-    const existingOrder = await this.ordersRepository.findOneBy({
-      uid: createOrderDto.uid,
-      isDeleted: false,
-    });
+      await this.ordersRepository.save(newOrder);
 
-    if (existingOrder && existingOrder.userId !== user.id) {
-      this.logger.error(
-        LogsTypes.ErrorUserNotAllowedToUpdateOrder,
-        createOrderDto.uid,
-        { user },
+      this.logger.log(LogsTypes.DbOrderCreated, newOrder.uid, {
+        order: newOrder,
+      });
+      await this.createAuditLog(newOrder, user.id);
+
+      return this.appResponseService.success(newOrder);
+    } catch (e) {
+      return this.appResponseService.error(
+        (e?.type as LogsTypes) || e,
+        e?.message || 'error in order.service.create',
+        null,
+        e?.meta || {},
       );
-      throw LogsTypes.ErrorUserNotAllowedToUpdateOrder;
     }
-
-    const newOrder = this.ordersRepository.create({
-      uid: String(createOrderDto.uid),
-      shortUid: `*${createOrderDto.uid.slice(-ORDER_UID_SHORT_LENGTH)}`,
-      receptionDate: OrdersService.parseReceptionDateFromUid(
-        createOrderDto.uid,
-      ),
-      isDeleted: false,
-      user,
-    });
-
-    await this.ordersRepository.save(newOrder);
-
-    this.logger.log(LogsTypes.DbOrderCreated, newOrder.uid, {
-      order: newOrder,
-    });
-    await this.createAuditLog(newOrder, user.id);
-
-    return newOrder;
   }
 
   async createAuditLog(newOrder: Order, userId: string, oldOrder?: Order) {
-    const auditLog = this.ordersAuditLogRepository.create({
-      orderUid: newOrder.uid,
-      userId,
-      oldStatusId: oldOrder?.statusId,
-      newStatusId: newOrder.statusId,
-      oldStatusName: oldOrder?.statusName,
-      newStatusName: newOrder.statusName,
-      oldStatusInternalName: oldOrder?.statusInternalName,
-      newStatusInternalName: newOrder.statusInternalName,
-      oldStatusPercent: oldOrder?.statusPercent,
-      newStatusPercent: newOrder.statusPercent,
-      isDeleted: newOrder.isDeleted,
-    });
+    try {
+      const auditLog = this.ordersAuditLogRepository.create({
+        orderUid: newOrder.uid,
+        userId,
+        oldStatusId: oldOrder?.statusId,
+        newStatusId: newOrder.statusId,
+        oldStatusName: oldOrder?.statusName,
+        newStatusName: newOrder.statusName,
+        oldStatusInternalName: oldOrder?.statusInternalName,
+        newStatusInternalName: newOrder.statusInternalName,
+        oldStatusPercent: oldOrder?.statusPercent,
+        newStatusPercent: newOrder.statusPercent,
+        isDeleted: newOrder.isDeleted,
+      });
 
-    const res = await this.ordersAuditLogRepository.save(auditLog);
-    this.logger.log(LogsTypes.DbOrderAuditCreated, res.id);
+      const res = await this.ordersAuditLogRepository.save(auditLog);
+      this.logger.log(LogsTypes.DbOrderAuditCreated, res.id);
+    } catch (e) {
+      this.appResponseService.error(LogsTypes.Error, e);
+    }
   }
 
   async update(existingOrder: Order, userId: string) {
     try {
       const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
       const midpassResult = await this.getStatusFromMidpass(existingOrder);
-      const updateOrderDto = midpassResult.updateOrderDto;
+      const updateOrderDto = midpassResult.data.updateOrderDto;
 
       if (updateOrderDto) {
         (existingOrder.sourceUid = updateOrderDto.sourceUid),
@@ -208,81 +232,122 @@ export class OrdersService {
         await this.createAuditLog(existingOrder, userId, oldOrder);
       } else {
         throw {
-          error: existingOrder.uid,
-          proxy: midpassResult.proxy,
+          message: existingOrder.uid,
+          proxy: midpassResult.data.proxy,
         };
       }
 
-      return {
+      return this.appResponseService.success({
         order: existingOrder,
-        proxy: midpassResult.proxy,
-      };
+        proxy: midpassResult.data.proxy,
+      });
     } catch (e) {
-      this.logger.error(LogsTypes.ErrorOrderRequest, e.error);
-      return {
-        error: e.error,
-        proxy: e.proxy,
-      };
+      return this.appResponseService.error(
+        LogsTypes.ErrorOrderRequest,
+        e?.message || 'error in order.service.update',
+        { proxy: e.proxy, order: existingOrder },
+      );
     }
   }
 
   async getAll() {
-    return await this.ordersRepository.find();
+    try {
+      return this.appResponseService.success(
+        await this.ordersRepository.find(),
+      );
+    } catch (e) {
+      return this.appResponseService.error(
+        LogsTypes.Error,
+        'error in orders.service.getAll',
+      );
+    }
   }
 
   async getAllFiltered() {
-    return await this.ordersRepository.findBy({
-      isDeleted: false,
-    });
+    try {
+      return this.appResponseService.success(
+        await this.ordersRepository.findBy({
+          isDeleted: false,
+        }),
+      );
+    } catch (e) {
+      return this.appResponseService.error(
+        LogsTypes.Error,
+        'error in orders.service.getAllFiltered',
+      );
+    }
   }
 
   async delete(uid: string, user: User) {
-    const existingOrder = await this.ordersRepository.findOneBy({
-      uid,
-    });
+    try {
+      const existingOrder = await this.ordersRepository.findOneBy({
+        uid,
+      });
 
-    if (existingOrder) {
-      if (existingOrder.userId !== user.id) {
-        this.logger.error(LogsTypes.ErrorUserNotAllowedToUpdateOrder, uid, {
-          user,
-        });
-        return null;
+      if (existingOrder) {
+        if (existingOrder.userId !== user.id) {
+          throw {
+            type: LogsTypes.ErrorUserNotAllowedToUpdateOrder,
+            message: uid,
+            data: null,
+            user,
+          };
+        }
+
+        existingOrder.isDeleted = true;
+        await this.ordersRepository.save(existingOrder);
+
+        this.logger.log(LogsTypes.DbOrderDeleted, existingOrder.uid, { user });
+        await this.createAuditLog(existingOrder, user.id);
+
+        return this.appResponseService.success(existingOrder);
+      } else {
+        throw {
+          type: LogsTypes.ErrorOrderNotFound,
+          message: uid,
+          meta: { user },
+        };
       }
-
-      existingOrder.isDeleted = true;
-      await this.ordersRepository.save(existingOrder);
-
-      this.logger.log(LogsTypes.DbOrderDeleted, existingOrder.uid, { user });
-      await this.createAuditLog(existingOrder, user.id);
-
-      return existingOrder;
-    } else {
-      this.logger.error(LogsTypes.ErrorOrderNotFound, uid, { user });
-      return null;
+    } catch (e) {
+      return this.appResponseService.error(
+        e?.type || LogsTypes.ErrorOrderNotFound,
+        e?.message || 'error in orders.service.delete',
+        null,
+        e?.meta || { user },
+      );
     }
   }
 
   async deleteAll(user: User) {
-    const existingOrders = await this.ordersRepository.findBy({
-      userId: user.id,
-    });
-
-    if (Array.isArray(existingOrders) && existingOrders.length) {
-      existingOrders.forEach((order) => {
-        order.isDeleted = true;
+    try {
+      const existingOrders = await this.ordersRepository.findBy({
+        userId: user.id,
       });
 
-      await this.ordersRepository.save(existingOrders);
+      if (Array.isArray(existingOrders) && existingOrders.length) {
+        existingOrders.forEach((order) => {
+          order.isDeleted = true;
+        });
 
-      for (const order of existingOrders) {
-        this.logger.log(LogsTypes.DbOrderDeleted, order.uid, { user });
-        await this.createAuditLog(order, user.id);
+        await this.ordersRepository.save(existingOrders);
+
+        for (const order of existingOrders) {
+          this.logger.log(LogsTypes.DbOrderDeleted, order.uid, { user });
+          await this.createAuditLog(order, user.id);
+        }
+
+        return this.appResponseService.success(existingOrders);
+      } else {
+        throw {
+          type: LogsTypes.ErrorOrdersNotFound,
+          message: user.id,
+        };
       }
-
-      return existingOrders;
-    } else {
-      this.logger.error(LogsTypes.ErrorOrdersNotFound, user.id);
-      return null;
+    } catch (e) {
+      return this.appResponseService.error(
+        e?.type || LogsTypes.Error,
+        e?.message || 'error in orders.service.deleteAll',
+      );
     }
   }
 }

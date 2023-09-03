@@ -38,22 +38,13 @@ export class LoggerService {
 
   log(logtype: LogsTypes, message: string, meta?: unknown) {
     this.logger.info(message, { logtype, meta });
-    // if (sendToAdmin) {
-    //   // TODO: sendToAdmin
-    // }
   }
 
   error(logtype: LogsTypes, message: string, meta?: unknown) {
     this.logger.error(message, { logtype, meta });
-    // if (sendToAdmin) {
-    //   // TODO: sendToAdmin
-    // }
   }
 
   warn(logtype: LogsTypes, message: string, meta?: unknown) {
     this.logger.warn(message, { logtype, meta });
-    // if (sendToAdmin) {
-    //   // TODO: sendToAdmin
-    // }
   }
 }

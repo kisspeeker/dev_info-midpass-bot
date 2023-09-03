@@ -14,11 +14,12 @@ import { UsersModule } from 'src/users/users.module';
 import { OrdersModule } from 'src/orders/orders.module';
 import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
-import { OrderAuditLog } from './orders/entity/order-audit-log.entity';
-import { KeyboardModule } from './keyboard/keyboard.module';
-import { MessageModule } from './message/message.module';
-import { BotModule } from './bot/bot.module';
-import { AutoupdateModule } from './autoupdate/autoupdate.module';
+import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
+import { KeyboardModule } from 'src/keyboard/keyboard.module';
+import { MessageModule } from 'src/message/message.module';
+import { BotModule } from 'src/bot/bot.module';
+import { AutoupdateModule } from 'src/autoupdate/autoupdate.module';
+import { AppResponseModule } from 'src/app-response/app-response.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { AutoupdateModule } from './autoupdate/autoupdate.module';
     MessageModule,
     BotModule,
     AutoupdateModule,
+    AppResponseModule,
   ],
 })
 export class AppModule {

@@ -16,6 +16,7 @@ import {
 import { MessageService } from 'src/message/message.service';
 import { BotService } from 'src/bot/bot.service';
 import { AutoupdateService } from 'src/autoupdate/autoupdate.service';
+import { Order } from 'src/orders/entity/order.entity';
 
 type TgContext = NarrowedContext<
   Context<Update>,
@@ -64,8 +65,15 @@ export class TelegramService {
     if (this.isUnderConstruction) {
       this.logger.log(LogsTypes.TgBotStart, 'isUnderConstruction');
     } else {
-      const usersCount = (await this.usersService.findAllWithOrders()).length;
-      this.logger.log(LogsTypes.TgBotStart, `UsersWithOrders: ${usersCount}`);
+      const usersCountResponse = await this.usersService.findAllWithOrders();
+      if (usersCountResponse.success) {
+        this.logger.log(
+          LogsTypes.TgBotStart,
+          `UsersWithOrders: ${
+            ((usersCountResponse.data as User[]) || []).length
+          }`,
+        );
+      }
     }
 
     this.bot.start(async (ctx: TgContext) => {
@@ -98,7 +106,11 @@ export class TelegramService {
     if (await this.handleCheckUnderConstruction(ctx)) {
       return;
     }
-    const user = await this.usersService.find(ctx.from);
+    const userResponse = await this.usersService.find(ctx.from);
+    if (!userResponse.success) {
+      return;
+    }
+    const user = userResponse.data as User;
 
     switch (eventName) {
       case TgEvents.Start:
@@ -226,29 +238,31 @@ export class TelegramService {
   private async handleUserActionUnsubscribe(ctx: TgContextAction, user: User) {
     const uid = ctx.match[1];
 
-    const deletedOrder = await this.ordersService.delete(uid, user);
-    if (deletedOrder) {
-      this.logger.log(LogsTypes.TgUserUnsubscribed, user.id, {
-        order: deletedOrder,
-      });
-      const updatedUser = await this.usersService.find(ctx.from);
-      const messageId = ctx.update.callback_query.message.message_id;
-
-      console.warn('updatedUser', updatedUser);
-
-      await this.messageService.sendMessage(
-        updatedUser,
-        this.i18n.t('user.message_unsubscribe_success', {
-          order: deletedOrder,
-        }),
-      );
-
-      if (messageId) {
-        await this.bot.telegram.deleteMessage(user.id, messageId);
-      }
+    const deletedOrderResponse = await this.ordersService.delete(uid, user);
+    if (!deletedOrderResponse.success) {
       return;
     }
-    this.logger.error(LogsTypes.ErrorOrderDelete, uid);
+    const deletedOrder = deletedOrderResponse.data as Order;
+    this.logger.log(LogsTypes.TgUserUnsubscribed, user.id, {
+      order: deletedOrder,
+    });
+    const updatedUserResponse = await this.usersService.find(ctx.from);
+    if (!updatedUserResponse.success) {
+      return;
+    }
+    const updatedUser = updatedUserResponse.data as User;
+    const messageId = ctx.update.callback_query.message.message_id;
+
+    await this.messageService.sendMessage(
+      updatedUser,
+      this.i18n.t('user.message_unsubscribe_success', {
+        order: deletedOrder,
+      }),
+    );
+
+    if (messageId) {
+      await this.bot.telegram.deleteMessage(user.id, messageId);
+    }
   }
 
   private async handleUserSubscribe(ctx: TgContext, user: User) {
@@ -269,8 +283,14 @@ export class TelegramService {
       return;
     }
 
-    const order = await this.ordersService.create({ uid }, user);
-    const updatedUser = await this.usersService.find(ctx.from);
+    const orderResponse = await this.ordersService.create({ uid }, user);
+    const updatedUserResponse = await this.usersService.find(ctx.from);
+
+    if (!orderResponse.success || !updatedUserResponse.success) {
+      return;
+    }
+    const order = orderResponse.data as Order;
+    const updatedUser = updatedUserResponse.data as User;
 
     if (order) {
       this.logger.log(LogsTypes.TgUserSubscribed, updatedUser.id, { order });
@@ -321,8 +341,12 @@ export class TelegramService {
 
   private async handleAdminSend(ctx: TgContext) {
     const userId = ctx.message.text.split(' ')[1];
-    const userToSend = await this.usersService.find({ id: userId });
     const messageToUser = ctx.message.text.split(' ').slice(2).join(' ');
+    const userToSendResponse = await this.usersService.find({ id: userId });
+    if (!userToSendResponse.success) {
+      return;
+    }
+    const userToSend = userToSendResponse.data as User;
 
     await this.messageService.sendMessage(userToSend, messageToUser, {
       disable_notification: true,

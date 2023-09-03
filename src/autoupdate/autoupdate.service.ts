@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { AppResponseService } from 'src/app-response/app-response.service';
 import { API_ROUTE_MIDPASS_PROXIES } from 'src/constants';
 import { AutoupdateSchedules, LogsTypes, Timeouts } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
 import { MessageService } from 'src/message/message.service';
 import { Order } from 'src/orders/entity/order.entity';
 import { OrdersService } from 'src/orders/orders.service';
+import { User } from 'src/users/entity/user.entity';
 import { UsersService } from 'src/users/users.service';
 import { calculateTimeDifference, sleep } from 'src/utils';
 
@@ -29,6 +31,7 @@ export class AutoupdateService {
     private readonly messageService: MessageService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly logger: LoggerService,
+    private readonly appResponseService: AppResponseService,
   ) {}
 
   public initCronjobs() {
@@ -51,7 +54,11 @@ export class AutoupdateService {
     this.logger.log(LogsTypes.AutoupdateStart, `${startDate}`);
 
     try {
-      const orders = await this.ordersService.getAllFiltered();
+      const ordersResponse = await this.ordersService.getAllFiltered();
+      if (!ordersResponse.success) {
+        throw LogsTypes.ErrorAutoupdateRoot;
+      }
+      const orders = ordersResponse.data as Order[];
       counter.ordersAll = orders.length;
 
       for (const order of orders) {
@@ -62,7 +69,10 @@ export class AutoupdateService {
       counter.usersChecked = [...new Set(counter.usersCheckedList)].length;
       counter.duration = calculateTimeDifference(startDate);
     } catch (e) {
-      this.logger.error(LogsTypes.ErrorAutoupdateRoot, e);
+      this.appResponseService.error(
+        LogsTypes.ErrorAutoupdateRoot,
+        'error in autoupdate.service.handleAutoupdateOrders',
+      );
     } finally {
       this.logger.log(LogsTypes.AutoupdateEnd, `${new Date()}`, { counter });
     }
@@ -92,15 +102,17 @@ export class AutoupdateService {
       counter.ordersChecked++;
       counter.usersCheckedList.push(order.userId);
 
-      const midpassResult = await this.ordersService.update(
+      const midpassResultResponse = await this.ordersService.update(
         order,
         order.userId,
       );
-
-      if (midpassResult.error) {
-        counter.routes[midpassResult.proxy]++;
-        throw `handleAutoupdateOrders processOrder ${midpassResult.error}`;
+      if (!midpassResultResponse.success) {
+        counter.routes[midpassResultResponse.data.proxy]++;
+        throw {
+          message: midpassResultResponse.error,
+        };
       }
+      const midpassResult = midpassResultResponse.data;
 
       counter.routes[midpassResult.proxy] =
         (counter.routes[midpassResult.proxy] || 0) + 1;
@@ -111,7 +123,11 @@ export class AutoupdateService {
       );
 
       if (hasChanges) {
-        const user = await this.usersService.find({ id: order.userId });
+        const userResponse = await this.usersService.find({ id: order.userId });
+        if (!userResponse.success) {
+          return;
+        }
+        const user = userResponse.data as User;
         counter.ordersUpdated++;
         await this.messageService.sendMessageStatus(user, midpassResult.order);
         this.logger.log(LogsTypes.AutoupdateOrderChanged, user.id, { order });
@@ -122,7 +138,9 @@ export class AutoupdateService {
       });
     } catch (e) {
       counter.ordersError++;
-      this.logger.error(LogsTypes.ErrorAutoupdateOrder, e, { order });
+      this.appResponseService.error(LogsTypes.ErrorAutoupdateOrder, e, null, {
+        order,
+      });
     }
   }
 }
