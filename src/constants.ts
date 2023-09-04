@@ -1,6 +1,7 @@
 export const MAX_ORDERS_PER_USER = 2;
 export const ORDER_UID_SHORT_LENGTH = 6;
-export const API_MIDPASS_NETWORK_TIMEOUT = 10000;
+export const TG_RATE_LIMIT = 1000; // ms
+export const API_MIDPASS_NETWORK_TIMEOUT = 10000; // ms
 
 export const API_ROUTE_MIDPASS_PROXIES = [
   'https://info.midpass.ru/api/request',

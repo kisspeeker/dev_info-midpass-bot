@@ -82,7 +82,7 @@ export class TelegramService {
       }
     }
 
-    this.bot.start(async (ctx: TgContext) => {
+    this.bot.start((ctx: TgContext) => {
       this.handleUserEvent(ctx, TgEvents.Start);
     });
 
@@ -92,15 +92,15 @@ export class TelegramService {
       });
     }
 
-    this.bot.on(message('text'), async (ctx: TgContext) => {
+    this.bot.on(message('text'), (ctx: TgContext) => {
       this.handleUserEvent(ctx, TgEvents.Text);
     });
 
-    this.bot.action(/unsubscribe (.+)/, async (ctx: TgContextAction) => {
+    this.bot.action(/unsubscribe (.+)/, (ctx: TgContextAction) => {
       this.handleUserEvent(ctx, TgEvents.Action);
     });
 
-    this.bot.catch(async (e) => {
+    this.bot.catch((e) => {
       this.appResponseService.error(
         LogsTypes.ErrorBotCatch,
         '=== BOT CATCH ===',
@@ -126,29 +126,29 @@ export class TelegramService {
     switch (eventName) {
       case TgEvents.Start:
       case BotCommands.Start:
-        await this.handleUserStart(ctx as TgContext, user);
+        this.handleUserStart(ctx as TgContext, user);
         break;
       case BotCommands.Help:
       case BotCommands.FaqBase:
-        await this.handleUserFaqBase(ctx as TgContext, user);
+        this.handleUserFaqBase(ctx as TgContext, user);
         break;
       case BotCommands.FaqStatuses:
-        await this.handleUserFaqStatuses(ctx as TgContext, user);
+        this.handleUserFaqStatuses(ctx as TgContext, user);
         break;
       case BotCommands.Contacts:
-        await this.handleUserContacts(ctx as TgContext, user);
+        this.handleUserContacts(ctx as TgContext, user);
         break;
       case BotCommands.Schedule:
-        await this.handleUserSchedule(ctx as TgContext, user);
+        this.handleUserSchedule(ctx as TgContext, user);
         break;
       case TgEvents.Action:
-        await this.handleUserActionUnsubscribe(ctx as TgContextAction, user);
+        this.handleUserActionUnsubscribe(ctx as TgContextAction, user);
         break;
       case TgEvents.Text:
-        await this.handleUserText(ctx as TgContext, user);
+        this.handleUserText(ctx as TgContext, user);
         break;
       default:
-        await this.handleUserText(ctx as TgContext, user);
+        this.handleUserText(ctx as TgContext, user);
         break;
     }
   }
@@ -181,7 +181,7 @@ export class TelegramService {
             this.handleUserSubscribe(ctx, user);
             return;
           }
-          await this.notificationService.sendMessageToAdmin(ctx.message.text);
+          this.notificationService.sendMessageToAdmin(ctx.message.text);
       }
     } catch (e) {
       this.appResponseService.error(LogsTypes.Error, e);
@@ -304,8 +304,10 @@ export class TelegramService {
       return;
     }
 
-    const orderResponse = await this.ordersService.create({ uid }, user);
-    const updatedUserResponse = await this.usersService.find(ctx.from);
+    const [orderResponse, updatedUserResponse] = await Promise.all([
+      this.ordersService.create({ uid }, user),
+      this.usersService.find(ctx.from),
+    ]);
 
     if (!orderResponse.success || !updatedUserResponse.success) {
       if (

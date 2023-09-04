@@ -1,4 +1,8 @@
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rateLimit = require('telegraf-ratelimit');
+
 import { Injectable } from '@nestjs/common';
+import { TG_RATE_LIMIT } from 'src/constants';
 import { BotCommands } from 'src/enums';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 import { Telegraf } from 'telegraf';
@@ -10,7 +14,15 @@ export class BotService {
     process.env.IS_UNDER_CONSTRUCTION === 'true';
 
   constructor(private readonly i18n: CustomI18nService) {
+    const rateLimitMiddleware = rateLimit({
+      window: TG_RATE_LIMIT,
+      limit: 1,
+      onLimitExceeded: (ctx) =>
+        ctx.reply(this.i18n.t('user_errors.message_rate_limit')),
+    });
+
     this.bot = new Telegraf(process.env.TG_BOT_TOKEN);
+    this.bot.use(rateLimitMiddleware);
   }
 
   get botCommands() {
