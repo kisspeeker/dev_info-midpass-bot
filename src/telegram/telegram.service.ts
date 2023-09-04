@@ -17,6 +17,7 @@ import { MessageService } from 'src/message/message.service';
 import { BotService } from 'src/bot/bot.service';
 import { AutoupdateService } from 'src/autoupdate/autoupdate.service';
 import { AppResponseService } from 'src/app-response/app-response.service';
+import { NotificationService } from 'src/notification/notification.service';
 
 type TgContext = NarrowedContext<
   Context<Update>,
@@ -52,6 +53,7 @@ export class TelegramService {
     private readonly usersService: UsersService,
     private readonly ordersService: OrdersService,
     private readonly messageService: MessageService,
+    private readonly notificationService: NotificationService,
     private readonly autoupdateService: AutoupdateService,
     private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
@@ -59,18 +61,23 @@ export class TelegramService {
   ) {
     this.bot = this.botService.bot;
     this.initBot();
-    this.autoupdateService.initCronjobs();
+    // this.autoupdateService.initCronjobs();
   }
 
   private async initBot() {
     if (this.isUnderConstruction) {
-      this.logger.log(LogsTypes.TgBotStart, 'isUnderConstruction');
+      this.appResponseService.success(
+        LogsTypes.TgBotStart,
+        'isUnderConstruction',
+        null,
+      );
     } else {
       const usersCountResponse = await this.usersService.findAllWithOrders();
       if (usersCountResponse.success) {
-        this.logger.log(
+        this.appResponseService.success(
           LogsTypes.TgBotStart,
           `UsersWithOrders: ${(usersCountResponse.data || []).length}`,
+          null,
         );
       }
     }
@@ -93,8 +100,13 @@ export class TelegramService {
       this.handleUserEvent(ctx, TgEvents.Action);
     });
 
-    this.bot.catch((e) => {
-      this.logger.error(LogsTypes.Error, '=== BOT CATCH ===', { error: e });
+    this.bot.catch(async (e) => {
+      this.appResponseService.error(
+        LogsTypes.ErrorBotCatch,
+        '=== BOT CATCH ===',
+        null,
+        { error: e },
+      );
     });
   }
 
@@ -169,18 +181,18 @@ export class TelegramService {
             this.handleUserSubscribe(ctx, user);
             return;
           }
-          await this.messageService.sendMessageToAdmin(ctx.message.text);
+          await this.notificationService.sendMessageToAdmin(ctx.message.text);
       }
     } catch (e) {
-      this.logger.error(LogsTypes.Error, e);
+      this.appResponseService.error(LogsTypes.Error, e);
     }
   }
 
   private async handleCheckUnderConstruction(ctx: TgContext | TgContextAction) {
     if (this.isUnderConstruction) {
-      await this.bot.telegram.sendMessage(
+      this.bot.telegram.sendMessage(
         ctx.from.id,
-        this.i18n.t('user.message_donate'),
+        this.i18n.t('user.message_under_construction'),
         {
           parse_mode: 'HTML',
           disable_web_page_preview: true,
@@ -191,47 +203,41 @@ export class TelegramService {
   }
 
   private async handleUserStart(ctx: TgContext, user: User) {
-    this.logger.log(LogsTypes.TgUserStart, user.id);
-    await this.messageService.sendMessage(
-      user,
-      this.i18n.t('user.message_start'),
-    );
+    this.appResponseService.success(LogsTypes.TgUserStart, user.id, null);
+    this.messageService.sendMessage(user, this.i18n.t('user.message_start'));
   }
 
   private async handleUserFaqBase(ctx: TgContext, user: User) {
-    this.logger.log(LogsTypes.TgUserFaqBase, user.id);
-    await this.messageService.sendMessage(
-      user,
-      this.i18n.t('user.message_faq_base'),
-    );
+    this.appResponseService.success(LogsTypes.TgUserFaqBase, user.id, null);
+    this.messageService.sendMessage(user, this.i18n.t('user.message_faq_base'));
   }
 
   private async handleUserFaqStatuses(ctx: TgContext, user: User) {
-    this.logger.log(LogsTypes.TgUserFaqStatuses, user.id);
-    await this.messageService.sendMessage(
+    this.appResponseService.success(LogsTypes.TgUserFaqStatuses, user.id, null);
+    this.messageService.sendMessage(
       user,
       this.i18n.t('user.message_faq_statuses'),
     );
   }
 
   private async handleUserContacts(ctx: TgContext, user: User) {
-    this.logger.log(LogsTypes.TgUserContacts, user.id);
-    await this.messageService.sendMessage(
+    this.appResponseService.success(LogsTypes.TgUserContacts, user.id, null);
+    this.messageService.sendMessage(
       user,
       this.i18n.t('user.message_contacts') + this.i18n.t('user.message_donate'),
     );
   }
 
   private async handleUserSchedule(ctx: TgContext, user: User) {
-    this.logger.log(LogsTypes.TgUserSchedule, user.id);
-    await this.messageService.sendMessage(
+    this.appResponseService.success(LogsTypes.TgUserSchedule, user.id, null);
+    this.messageService.sendMessage(
       user,
       this.i18n.t('user.message_autoupdate_schedules'),
     );
   }
 
   private async handleUserUnsubscribe(ctx: TgContext, user: User) {
-    await this.messageService.sendMessageInline(user);
+    this.messageService.sendMessageInline(user);
   }
 
   private async handleUserActionUnsubscribe(ctx: TgContextAction, user: User) {
@@ -239,7 +245,7 @@ export class TelegramService {
 
     const deletedOrderResponse = await this.ordersService.delete(uid, user);
     if (!deletedOrderResponse.success) {
-      await this.messageService.sendMessage(
+      this.messageService.sendMessage(
         user,
         this.i18n.t('user_errors.message_order_unsubscribe', {
           order: { uid },
@@ -248,9 +254,14 @@ export class TelegramService {
       return;
     }
     const deletedOrder = deletedOrderResponse.data;
-    this.logger.log(LogsTypes.TgUserUnsubscribed, user.id, {
-      order: deletedOrder,
-    });
+    this.appResponseService.success(
+      LogsTypes.TgUserUnsubscribed,
+      user.id,
+      null,
+      {
+        order: deletedOrder,
+      },
+    );
     const updatedUserResponse = await this.usersService.find(ctx.from);
     if (!updatedUserResponse.success) {
       return;
@@ -258,7 +269,7 @@ export class TelegramService {
     const updatedUser = updatedUserResponse.data;
     const messageId = ctx.update.callback_query.message.message_id;
 
-    await this.messageService.sendMessage(
+    this.messageService.sendMessage(
       updatedUser,
       this.i18n.t('user.message_unsubscribe_success', {
         order: deletedOrder,
@@ -266,7 +277,7 @@ export class TelegramService {
     );
 
     if (messageId) {
-      await this.bot.telegram.deleteMessage(user.id, messageId);
+      this.bot.telegram.deleteMessage(user.id, messageId);
     }
   }
 
@@ -277,10 +288,15 @@ export class TelegramService {
     );
 
     if (existingOrder) {
-      this.logger.log(LogsTypes.TgUserSubscribedAlready, user.id, {
-        order: existingOrder,
-      });
-      await this.messageService.sendMessageStatus(
+      this.appResponseService.success(
+        LogsTypes.TgUserSubscribedAlready,
+        user.id,
+        null,
+        {
+          order: existingOrder,
+        },
+      );
+      this.messageService.sendMessageStatus(
         user,
         existingOrder,
         'subscribedAlready',
@@ -296,14 +312,14 @@ export class TelegramService {
         orderResponse.success === false &&
         orderResponse.error === LogsTypes.ErrorMaxOrdersPerUser
       ) {
-        await this.messageService.sendMessage(
+        this.messageService.sendMessage(
           user,
           this.i18n.t('user_errors.message_max_orders_per_user', {
             count: user.filteredOrders.length,
           }),
         );
       } else {
-        await this.messageService.sendMessage(
+        this.messageService.sendMessage(
           user,
           this.i18n.t('user_errors.message_order_subscribe', {
             order: { uid },
@@ -316,12 +332,13 @@ export class TelegramService {
     const updatedUser = updatedUserResponse.data;
 
     if (order) {
-      this.logger.log(LogsTypes.TgUserSubscribed, updatedUser.id, { order });
-      await this.messageService.sendMessageStatus(
-        updatedUser,
-        order,
-        'subscribed',
+      this.appResponseService.success(
+        LogsTypes.TgUserSubscribed,
+        updatedUser.id,
+        null,
+        { order },
       );
+      this.messageService.sendMessageStatus(updatedUser, order, 'subscribed');
       return;
     }
 
@@ -331,7 +348,7 @@ export class TelegramService {
       null,
       { order },
     );
-    await this.messageService.sendMessage(
+    this.messageService.sendMessage(
       updatedUser,
       this.i18n.t('user_errors.message_order_validate'),
     );
@@ -346,15 +363,20 @@ export class TelegramService {
       );
 
       if (existingOrder) {
-        this.logger.log(LogsTypes.TgUserOrderStatus, user.id, {
-          order: existingOrder,
-        });
-        await this.messageService.sendMessageStatus(user, existingOrder);
+        this.appResponseService.success(
+          LogsTypes.TgUserOrderStatus,
+          user.id,
+          null,
+          {
+            order: existingOrder,
+          },
+        );
+        this.messageService.sendMessageStatus(user, existingOrder);
       } else {
         this.appResponseService.error(LogsTypes.ErrorOrderNotFound, uid, null, {
           user,
         });
-        await this.messageService.sendMessage(
+        this.messageService.sendMessage(
           user,
           this.i18n.t('user_errors.message_order_not_found'),
         );
@@ -365,7 +387,7 @@ export class TelegramService {
     this.appResponseService.error(LogsTypes.ErrorOrderValidate, uid, null, {
       user,
     });
-    await this.messageService.sendMessage(
+    this.messageService.sendMessage(
       user,
       this.i18n.t('user_errors.message_order_validate'),
     );
@@ -380,12 +402,12 @@ export class TelegramService {
     }
     const userToSend = userToSendResponse.data;
 
-    await this.messageService.sendMessage(userToSend, messageToUser, {
+    this.messageService.sendMessage(userToSend, messageToUser, {
       disable_notification: true,
     });
   }
 
   private async handleAdminTest(ctx: TgContext, user: User) {
-    await this.messageService.sendMessage(user, 'Тестовая команда для админа');
+    this.messageService.sendMessage(user, 'Тестовая команда для админа');
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
+import { NotificationService } from 'src/notification/notification.service';
 
 export type AppResponseSuccess<T> = {
   success: true;
@@ -16,22 +17,39 @@ export type AppResponseError<T> = {
 
 @Injectable()
 export class AppResponseService {
-  constructor(private readonly logger: LoggerService) {}
+  constructor(
+    private readonly logger: LoggerService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
-  public success<T>(data: T): AppResponseSuccess<T> {
+  private async eventHandler(type: LogsTypes) {
+    // await this.notificationService.sendMessageToAdmin(`${type}`);
+    console.warn('eventHandler', type);
+  }
+
+  public async success<T>(
+    type: LogsTypes,
+    message: string,
+    data: T,
+    meta?: unknown,
+  ): Promise<AppResponseSuccess<T>> {
+    this.logger.log(type, message, meta);
+    this.eventHandler(type);
+
     return {
       success: true,
       data,
     };
   }
 
-  public error<T>(
+  public async error<T>(
     type: LogsTypes,
     message: string,
     data?: T,
     meta?: unknown,
-  ): AppResponseError<T> {
+  ): Promise<AppResponseError<T>> {
     this.logger.error(type, message, meta);
+    this.eventHandler(type);
 
     return {
       success: false,

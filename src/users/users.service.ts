@@ -28,11 +28,13 @@ export class UsersService {
       });
 
       await this.usersRepository.save(newUser);
-      this.logger.log(LogsTypes.DbUserCreated, newUser.id, newUser);
-
-      return this.appResponseService.success(newUser);
+      return await this.appResponseService.success(
+        LogsTypes.DbUserCreated,
+        newUser.id,
+        newUser,
+      );
     } catch (e) {
-      return this.appResponseService.error<User>(
+      return await this.appResponseService.error<User>(
         LogsTypes.ErrorUserCreate,
         e,
         null,
@@ -45,11 +47,14 @@ export class UsersService {
 
   async findAll() {
     try {
-      return this.appResponseService.success(
-        await this.usersRepository.find({ relations: ['orders'] }),
+      const users = await this.usersRepository.find({ relations: ['orders'] });
+      return await this.appResponseService.success(
+        LogsTypes.DbUsersGetAll,
+        String(users.length),
+        users,
       );
     } catch (e) {
-      return this.appResponseService.error<User[]>(
+      return await this.appResponseService.error<User[]>(
         LogsTypes.ErrorUsersFindAll,
         e,
       );
@@ -64,10 +69,15 @@ export class UsersService {
       queryBuilder.innerJoinAndSelect('user.orders', 'order');
       queryBuilder.groupBy('user.id');
       queryBuilder.having('COUNT(order.uid) > 0');
+      const users = await queryBuilder.getMany();
 
-      return this.appResponseService.success(await queryBuilder.getMany());
+      return await this.appResponseService.success(
+        LogsTypes.DbUsersGetAllWithOrders,
+        String(users.length),
+        users,
+      );
     } catch (e) {
-      return this.appResponseService.error<User[]>(
+      return await this.appResponseService.error<User[]>(
         LogsTypes.ErrorUsersFindWithOrders,
         e,
       );
@@ -93,9 +103,16 @@ export class UsersService {
         user = (await this.create(createUserDto)).data;
       }
 
-      return this.appResponseService.success(user);
+      return this.appResponseService.success(
+        LogsTypes.DbUserGet,
+        user.id,
+        user,
+      );
     } catch (e) {
-      return this.appResponseService.error<User>(LogsTypes.ErrorUserFind, e);
+      return await this.appResponseService.error<User>(
+        LogsTypes.ErrorUserFind,
+        e,
+      );
     }
   }
 }

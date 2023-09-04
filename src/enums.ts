@@ -14,6 +14,7 @@ export enum Timeouts {
 
 export enum LogsTypes {
   Error = 'ERROR',
+  ErrorBotCatch = 'ERROR_BOT_CATCH',
   ErrorMidpassTimeout = 'ERROR_MIDPASS_TIMEOUT',
   ErrorAutoupdateRoot = 'ERROR_AUTOUPDATE_ROOT',
   ErrorAutoupdateOrder = 'ERROR_AUTOUPDATE_ORDER',
@@ -35,10 +36,18 @@ export enum LogsTypes {
   ErrorOrdersNotFound = 'ERROR_ORDERS_NOT_FOUND',
   ErrorMaxOrdersPerUser = 'ERROR_MAX_ORDERS_PER_USER',
 
+  OrderRequestMidpass = 'ORDER_REQUEST_MIDPASS',
+
   DbUserCreated = 'DB_USER_CREATED',
+  DbUserGet = 'DB_USER_GET',
+  DbUsersGetAll = 'DB_USERS_GET_ALL',
+  DbUsersGetAllWithOrders = 'DB_USERS_GET_ALL_WITH_ORDERS',
   DbOrderCreated = 'DB_ORDER_CREATED',
   DbOrderUpdated = 'DB_ORDER_UPDATED',
   DbOrderDeleted = 'DB_ORDER_DELETED',
+  DbOrdersDeletedAll = 'DB_ORDERS_DELETED_ALL',
+  DbOrdersGetAll = 'DB_ORDERS_GET_ALL',
+  DbOrdersGetAllFiltered = 'DB_ORDERS_GET_ALL_FILTERED',
   DbOrderAuditCreated = 'DB_ORDER_AUDIT_CREATED',
 
   TgBotStart = 'TG_BOT_START',

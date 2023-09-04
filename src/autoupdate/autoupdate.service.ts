@@ -51,7 +51,11 @@ export class AutoupdateService {
   private async handleAutoupdateOrders() {
     const startDate = new Date();
     const counter = this.initAutoupdateCounter();
-    this.logger.log(LogsTypes.AutoupdateStart, `${startDate}`);
+    this.appResponseService.success(
+      LogsTypes.AutoupdateStart,
+      `${startDate}`,
+      null,
+    );
 
     try {
       const ordersResponse = await this.ordersService.getAllFiltered();
@@ -78,7 +82,12 @@ export class AutoupdateService {
         'error in autoupdate.service.handleAutoupdateOrders',
       );
     } finally {
-      this.logger.log(LogsTypes.AutoupdateEnd, `${new Date()}`, { counter });
+      this.appResponseService.success(
+        LogsTypes.AutoupdateEnd,
+        `${new Date()}`,
+        null,
+        { counter },
+      );
     }
   }
 
@@ -133,13 +142,23 @@ export class AutoupdateService {
         }
         const user = userResponse.data;
         counter.ordersUpdated++;
-        await this.messageService.sendMessageStatus(user, midpassResult.order);
-        this.logger.log(LogsTypes.AutoupdateOrderChanged, user.id, { order });
+        this.messageService.sendMessageStatus(user, midpassResult.order);
+        this.appResponseService.success(
+          LogsTypes.AutoupdateOrderChanged,
+          user.id,
+          null,
+          { order },
+        );
         return;
       }
-      this.logger.log(LogsTypes.AutoupdateOrderWithoutChanges, order.userId, {
-        order,
-      });
+      this.appResponseService.success(
+        LogsTypes.AutoupdateOrderWithoutChanges,
+        order.userId,
+        null,
+        {
+          order,
+        },
+      );
     } catch (e) {
       counter.ordersError++;
       if (e?.message === LogsTypes.ErrorOrderRequestMidpassNotFound) {

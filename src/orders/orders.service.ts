@@ -122,21 +122,29 @@ export class OrdersService {
       if (!updateOrderDto) {
         throw LogsTypes.ErrorOrderRequestMidpassNotFound;
       }
-      return this.appResponseService.success({
-        updateOrderDto,
-        proxy,
-      });
+      return await this.appResponseService.success(
+        LogsTypes.OrderRequestMidpass,
+        updateOrderDto.uid,
+        {
+          updateOrderDto,
+          proxy,
+        },
+      );
     } catch (e) {
       if (e instanceof TimeoutError) {
-        return this.appResponseService.error(
+        return await this.appResponseService.error(
           LogsTypes.ErrorMidpassTimeout,
           e?.message || 'error in order.service.update',
           { proxy },
         );
       } else {
-        return this.appResponseService.error(LogsTypes.ErrorOrderRequest, e, {
-          proxy,
-        });
+        return await this.appResponseService.error(
+          LogsTypes.ErrorOrderRequest,
+          e,
+          {
+            proxy,
+          },
+        );
       }
     } finally {
       this.proxyIndex++;
@@ -181,15 +189,15 @@ export class OrdersService {
       });
 
       await this.ordersRepository.save(newOrder);
-
-      this.logger.log(LogsTypes.DbOrderCreated, newOrder.uid, {
-        order: newOrder,
-      });
       await this.createAuditLog(newOrder, user.id);
 
-      return this.appResponseService.success(newOrder);
+      return await this.appResponseService.success(
+        LogsTypes.DbOrderCreated,
+        newOrder.uid,
+        newOrder,
+      );
     } catch (e) {
-      return this.appResponseService.error(
+      return await this.appResponseService.error(
         (e?.type as LogsTypes) || e,
         e?.message || 'error in order.service.create',
         null,
@@ -215,7 +223,11 @@ export class OrdersService {
       });
 
       const res = await this.ordersAuditLogRepository.save(auditLog);
-      this.logger.log(LogsTypes.DbOrderAuditCreated, res.id);
+      this.appResponseService.success(
+        LogsTypes.DbOrderAuditCreated,
+        res.id,
+        null,
+      );
     } catch (e) {
       this.appResponseService.error(LogsTypes.Error, e);
     }
@@ -246,16 +258,17 @@ export class OrdersService {
           (existingOrder.isDeleted = false),
           await this.ordersRepository.save(existingOrder);
 
-        this.logger.log(LogsTypes.DbOrderUpdated, existingOrder.uid, {
-          order: existingOrder,
-        });
         await this.createAuditLog(existingOrder, userId, oldOrder);
       }
 
-      return this.appResponseService.success({
-        order: existingOrder,
-        proxy: midpassResponse.data.proxy,
-      });
+      return await this.appResponseService.success(
+        LogsTypes.DbOrderUpdated,
+        existingOrder.uid,
+        {
+          order: existingOrder,
+          proxy: midpassResponse.data.proxy,
+        },
+      );
     } catch (e) {
       return e;
     }
@@ -264,9 +277,13 @@ export class OrdersService {
   async getAll() {
     try {
       const orders = await this.ordersRepository.find();
-      return this.appResponseService.success(orders);
+      return this.appResponseService.success(
+        LogsTypes.DbOrdersGetAll,
+        String(orders.length),
+        orders,
+      );
     } catch (e) {
-      return this.appResponseService.error<Order[]>(
+      return await this.appResponseService.error<Order[]>(
         LogsTypes.Error,
         'error in orders.service.getAll',
       );
@@ -278,9 +295,13 @@ export class OrdersService {
       const orders = await this.ordersRepository.findBy({
         isDeleted: false,
       });
-      return this.appResponseService.success(orders);
+      return await this.appResponseService.success(
+        LogsTypes.DbOrdersGetAllFiltered,
+        String(orders.length),
+        orders,
+      );
     } catch (e) {
-      return this.appResponseService.error<Order[]>(
+      return await this.appResponseService.error<Order[]>(
         LogsTypes.Error,
         'error in orders.service.getAllFiltered',
       );
@@ -305,11 +326,13 @@ export class OrdersService {
 
         existingOrder.isDeleted = true;
         await this.ordersRepository.save(existingOrder);
-
-        this.logger.log(LogsTypes.DbOrderDeleted, existingOrder.uid, { user });
         await this.createAuditLog(existingOrder, user.id);
 
-        return this.appResponseService.success(existingOrder);
+        return await this.appResponseService.success(
+          LogsTypes.DbOrderDeleted,
+          existingOrder.uid,
+          existingOrder,
+        );
       } else {
         throw {
           type: LogsTypes.ErrorOrderNotFound,
@@ -318,7 +341,7 @@ export class OrdersService {
         };
       }
     } catch (e) {
-      return this.appResponseService.error(
+      return await this.appResponseService.error(
         e?.type || LogsTypes.ErrorOrderNotFound,
         e?.message || 'error in orders.service.delete',
         null,
@@ -341,11 +364,20 @@ export class OrdersService {
         await this.ordersRepository.save(existingOrders);
 
         for (const order of existingOrders) {
-          this.logger.log(LogsTypes.DbOrderDeleted, order.uid, { user });
+          this.appResponseService.success(
+            LogsTypes.DbOrderDeleted,
+            order.uid,
+            order,
+          );
           await this.createAuditLog(order, user.id);
         }
 
-        return this.appResponseService.success(existingOrders);
+        return await this.appResponseService.success(
+          LogsTypes.DbOrdersDeletedAll,
+          user.id,
+          existingOrders,
+          { user },
+        );
       } else {
         throw {
           type: LogsTypes.ErrorOrdersNotFound,
@@ -353,7 +385,7 @@ export class OrdersService {
         };
       }
     } catch (e) {
-      return this.appResponseService.error(
+      return await this.appResponseService.error(
         e?.type || LogsTypes.Error,
         e?.message || 'error in orders.service.deleteAll',
       );

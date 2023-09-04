@@ -41,15 +41,6 @@ export class MessageService {
       this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e);
     }
   }
-  async sendMessageToAdmin(message: string) {
-    try {
-      await this.bot.telegram.sendMessage(this.adminId, message, {
-        parse_mode: 'HTML',
-      });
-    } catch (e) {
-      this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e);
-    }
-  }
 
   async sendMessageInline(user: User) {
     try {
