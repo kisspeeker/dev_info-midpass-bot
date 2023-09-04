@@ -1,19 +1,24 @@
-import { Global, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
 
-export type AppResponse<T = unknown> = {
-  success: boolean;
+export type AppResponseSuccess<T> = {
+  success: true;
   data: T;
-  error?: LogsTypes;
 };
 
-@Global()
+export type AppResponseError<T> = {
+  success: false;
+  message: string;
+  data?: T;
+  error: LogsTypes;
+};
+
 @Injectable()
 export class AppResponseService {
   constructor(private readonly logger: LoggerService) {}
 
-  public success<T>(data: T): AppResponse<T> {
+  public success<T>(data: T): AppResponseSuccess<T> {
     return {
       success: true,
       data,
@@ -25,12 +30,13 @@ export class AppResponseService {
     message: string,
     data?: T,
     meta?: unknown,
-  ): AppResponse<T> {
+  ): AppResponseError<T> {
     this.logger.error(type, message, meta);
 
     return {
       success: false,
       error: type,
+      message,
       data,
     };
   }

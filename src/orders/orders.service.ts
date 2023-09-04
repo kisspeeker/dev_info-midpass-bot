@@ -5,7 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { HttpService } from '@nestjs/axios';
 import { Repository } from 'typeorm';
-import { firstValueFrom } from 'rxjs';
+import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
 import { resolve } from 'path';
 
 import {
@@ -13,6 +13,7 @@ import {
   ORDER_UID_SHORT_LENGTH,
   FALSY_PASSPORT_STATUSES,
   MAX_ORDERS_PER_USER,
+  API_MIDPASS_NETWORK_TIMEOUT,
 } from 'src/constants';
 import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
@@ -24,8 +25,9 @@ import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 import { isValidDate } from 'src/utils';
 import {
-  AppResponse,
+  AppResponseError,
   AppResponseService,
+  AppResponseSuccess,
 } from 'src/app-response/app-response.service';
 
 @Injectable()
@@ -94,10 +96,14 @@ export class OrdersService {
   }
 
   private async getStatusFromMidpass(order: Order): Promise<
-    AppResponse<{
-      proxy: string;
-      updateOrderDto?: UpdateOrderDto;
-    }>
+    | AppResponseSuccess<{
+        proxy: string;
+        updateOrderDto?: UpdateOrderDto;
+      }>
+    | AppResponseError<{
+        proxy: string;
+        updateOrderDto?: UpdateOrderDto;
+      }>
   > {
     const proxy =
       API_ROUTE_MIDPASS_PROXIES[
@@ -106,20 +112,32 @@ export class OrdersService {
 
     try {
       const updateOrderDto = (
-        await firstValueFrom(this.httpService.get(`${proxy}/${order.uid}`))
+        await firstValueFrom(
+          this.httpService
+            .get(`${proxy}/${order.uid}`)
+            .pipe(timeout(API_MIDPASS_NETWORK_TIMEOUT)),
+        )
       ).data;
 
       if (!updateOrderDto) {
-        throw LogsTypes.ErrorOrderRequest;
+        throw LogsTypes.ErrorOrderRequestMidpassNotFound;
       }
       return this.appResponseService.success({
         updateOrderDto,
         proxy,
       });
-    } catch (error) {
-      return this.appResponseService.error(LogsTypes.ErrorOrderRequest, error, {
-        proxy,
-      });
+    } catch (e) {
+      if (e instanceof TimeoutError) {
+        return this.appResponseService.error(
+          LogsTypes.ErrorMidpassTimeout,
+          e?.message || 'error in order.service.update',
+          { proxy },
+        );
+      } else {
+        return this.appResponseService.error(LogsTypes.ErrorOrderRequest, e, {
+          proxy,
+        });
+      }
     } finally {
       this.proxyIndex++;
     }
@@ -206,10 +224,12 @@ export class OrdersService {
   async update(existingOrder: Order, userId: string) {
     try {
       const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
-      const midpassResult = await this.getStatusFromMidpass(existingOrder);
-      const updateOrderDto = midpassResult.data.updateOrderDto;
+      const midpassResponse = await this.getStatusFromMidpass(existingOrder);
+      const updateOrderDto = midpassResponse.data.updateOrderDto;
 
-      if (updateOrderDto) {
+      if (midpassResponse.success === false || !updateOrderDto) {
+        throw midpassResponse;
+      } else {
         (existingOrder.sourceUid = updateOrderDto.sourceUid),
           (existingOrder.receptionDate = updateOrderDto.receptionDate),
           (existingOrder.statusId =
@@ -230,33 +250,23 @@ export class OrdersService {
           order: existingOrder,
         });
         await this.createAuditLog(existingOrder, userId, oldOrder);
-      } else {
-        throw {
-          message: existingOrder.uid,
-          proxy: midpassResult.data.proxy,
-        };
       }
 
       return this.appResponseService.success({
         order: existingOrder,
-        proxy: midpassResult.data.proxy,
+        proxy: midpassResponse.data.proxy,
       });
     } catch (e) {
-      return this.appResponseService.error(
-        LogsTypes.ErrorOrderRequest,
-        e?.message || 'error in order.service.update',
-        { proxy: e.proxy, order: existingOrder },
-      );
+      return e;
     }
   }
 
   async getAll() {
     try {
-      return this.appResponseService.success(
-        await this.ordersRepository.find(),
-      );
+      const orders = await this.ordersRepository.find();
+      return this.appResponseService.success(orders);
     } catch (e) {
-      return this.appResponseService.error(
+      return this.appResponseService.error<Order[]>(
         LogsTypes.Error,
         'error in orders.service.getAll',
       );
@@ -265,13 +275,12 @@ export class OrdersService {
 
   async getAllFiltered() {
     try {
-      return this.appResponseService.success(
-        await this.ordersRepository.findBy({
-          isDeleted: false,
-        }),
-      );
+      const orders = await this.ordersRepository.findBy({
+        isDeleted: false,
+      });
+      return this.appResponseService.success(orders);
     } catch (e) {
-      return this.appResponseService.error(
+      return this.appResponseService.error<Order[]>(
         LogsTypes.Error,
         'error in orders.service.getAllFiltered',
       );

@@ -30,7 +30,7 @@ export class Order {
   @Column({ nullable: true })
   statusId: number;
 
-  @Column({ default: '-' })
+  @Column({ nullable: true })
   statusName: string;
 
   @Column({ nullable: true })
@@ -42,7 +42,7 @@ export class Order {
   @Column({ nullable: true })
   statusSubscription: boolean;
 
-  @Column({ default: '-' })
+  @Column({ nullable: true })
   statusInternalName: string;
 
   @Column({ nullable: true })
@@ -68,5 +68,17 @@ export class Order {
   get daysPassed() {
     const days = calculateDaysDifference(this.receptionDate);
     return Number.isNaN(days) ? '-' : days;
+  }
+
+  get formatBeauty() {
+    return {
+      ...this,
+      statusPercent: this.statusPercent === null ? '-' : this.statusPercent,
+      statusName: this.statusName === null ? '-' : this.statusName,
+      statusInternalName:
+        this.statusInternalName === null ? '-' : this.statusInternalName,
+      updatedAtTimeString: this.updatedAtTimeString,
+      daysPassed: this.daysPassed,
+    };
   }
 }

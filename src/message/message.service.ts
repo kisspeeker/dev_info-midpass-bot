@@ -12,6 +12,7 @@ import { Telegraf } from 'telegraf';
 @Injectable()
 export class MessageService {
   private bot: Telegraf;
+  private adminId: string = process.env.TG_ADMIN_ID;
 
   constructor(
     private readonly botService: BotService,
@@ -35,6 +36,15 @@ export class MessageService {
         disable_web_page_preview: true,
         ...this.keyboardService.useKeyboardDefault(user),
         ...extra,
+      });
+    } catch (e) {
+      this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e);
+    }
+  }
+  async sendMessageToAdmin(message: string) {
+    try {
+      await this.bot.telegram.sendMessage(this.adminId, message, {
+        parse_mode: 'HTML',
       });
     } catch (e) {
       this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e);
@@ -65,7 +75,7 @@ export class MessageService {
     try {
       const image = await OrdersService.getStatusImage(order);
       const orderBeauty = this.i18n.t('user.message_status_order_beauty', {
-        order,
+        order: order.formatBeauty,
       });
       const donate = this.i18n.t('user.message_donate');
       let message = this.i18n.t('user.message_order_empty');

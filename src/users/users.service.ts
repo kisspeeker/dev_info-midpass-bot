@@ -6,10 +6,7 @@ import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/users/entity/user.entity';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import {
-  AppResponse,
-  AppResponseService,
-} from 'src/app-response/app-response.service';
+import { AppResponseService } from 'src/app-response/app-response.service';
 
 @Injectable()
 export class UsersService {
@@ -20,9 +17,7 @@ export class UsersService {
     private readonly appResponseService: AppResponseService,
   ) {}
 
-  async create(
-    createUserDto: CreateUserDto,
-  ): Promise<AppResponse<User | unknown>> {
+  async create(createUserDto: CreateUserDto) {
     try {
       const newUser = this.usersRepository.create({
         id: String(createUserDto.id),
@@ -37,9 +32,14 @@ export class UsersService {
 
       return this.appResponseService.success(newUser);
     } catch (e) {
-      return this.appResponseService.error(LogsTypes.ErrorUserCreate, e, {
-        id: createUserDto.id,
-      });
+      return this.appResponseService.error<User>(
+        LogsTypes.ErrorUserCreate,
+        e,
+        null,
+        {
+          id: String(createUserDto.id),
+        },
+      );
     }
   }
 
@@ -49,7 +49,10 @@ export class UsersService {
         await this.usersRepository.find({ relations: ['orders'] }),
       );
     } catch (e) {
-      return this.appResponseService.error(LogsTypes.ErrorUsersFindAll, e);
+      return this.appResponseService.error<User[]>(
+        LogsTypes.ErrorUsersFindAll,
+        e,
+      );
     }
   }
 
@@ -64,7 +67,7 @@ export class UsersService {
 
       return this.appResponseService.success(await queryBuilder.getMany());
     } catch (e) {
-      return this.appResponseService.error(
+      return this.appResponseService.error<User[]>(
         LogsTypes.ErrorUsersFindWithOrders,
         e,
       );
@@ -84,15 +87,15 @@ export class UsersService {
           String(createUserDto.id),
         );
         const newUserResponse = await this.create(createUserDto);
-        if (!newUserResponse.success) {
-          throw newUserResponse.error;
+        if (newUserResponse.success === false) {
+          throw newUserResponse;
         }
-        user = (await this.create(createUserDto)).data as User;
+        user = (await this.create(createUserDto)).data;
       }
 
       return this.appResponseService.success(user);
     } catch (e) {
-      return this.appResponseService.error(LogsTypes.ErrorUserFind, e);
+      return this.appResponseService.error<User>(LogsTypes.ErrorUserFind, e);
     }
   }
 }

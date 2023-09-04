@@ -8,7 +8,6 @@ import { LoggerService } from 'src/logger/logger.service';
 import { MessageService } from 'src/message/message.service';
 import { Order } from 'src/orders/entity/order.entity';
 import { OrdersService } from 'src/orders/orders.service';
-import { User } from 'src/users/entity/user.entity';
 import { UsersService } from 'src/users/users.service';
 import { calculateTimeDifference, sleep } from 'src/utils';
 
@@ -18,6 +17,7 @@ type AutoupdateCounter = {
   ordersChecked: number;
   ordersUpdated: number;
   ordersError: number;
+  ordersErrorMidpassNotFound: number;
   routes: Record<string, number>;
   usersCheckedList: string[];
   duration: string;
@@ -56,13 +56,17 @@ export class AutoupdateService {
     try {
       const ordersResponse = await this.ordersService.getAllFiltered();
       if (!ordersResponse.success) {
-        throw LogsTypes.ErrorAutoupdateRoot;
+        throw ordersResponse;
       }
-      const orders = ordersResponse.data as Order[];
+
+      const orders = ordersResponse.data;
       counter.ordersAll = orders.length;
 
       for (const order of orders) {
-        await this.processOrder(order, counter);
+        const res = await this.processOrder(order, counter);
+        if (res.error === LogsTypes.ErrorMidpassTimeout) {
+          throw res;
+        }
         await sleep(Timeouts.CronjobNextOrder);
       }
 
@@ -85,6 +89,7 @@ export class AutoupdateService {
       ordersChecked: 0,
       ordersUpdated: 0,
       ordersError: 0,
+      ordersErrorMidpassNotFound: 0,
       routes: API_ROUTE_MIDPASS_PROXIES.reduce((acc, curr) => {
         acc[curr] = 0;
         return acc;
@@ -106,11 +111,10 @@ export class AutoupdateService {
         order,
         order.userId,
       );
-      if (!midpassResultResponse.success) {
+
+      if (midpassResultResponse.success === false) {
         counter.routes[midpassResultResponse.data.proxy]++;
-        throw {
-          message: midpassResultResponse.error,
-        };
+        throw midpassResultResponse;
       }
       const midpassResult = midpassResultResponse.data;
 
@@ -127,7 +131,7 @@ export class AutoupdateService {
         if (!userResponse.success) {
           return;
         }
-        const user = userResponse.data as User;
+        const user = userResponse.data;
         counter.ordersUpdated++;
         await this.messageService.sendMessageStatus(user, midpassResult.order);
         this.logger.log(LogsTypes.AutoupdateOrderChanged, user.id, { order });
@@ -138,9 +142,20 @@ export class AutoupdateService {
       });
     } catch (e) {
       counter.ordersError++;
-      this.appResponseService.error(LogsTypes.ErrorAutoupdateOrder, e, null, {
-        order,
-      });
+      if (e?.message === LogsTypes.ErrorOrderRequestMidpassNotFound) {
+        counter.ordersErrorMidpassNotFound++;
+      }
+
+      return e?.error === LogsTypes.ErrorMidpassTimeout
+        ? e
+        : this.appResponseService.error(
+            LogsTypes.ErrorAutoupdateOrder,
+            e?.error || e?.message || e,
+            null,
+            {
+              order,
+            },
+          );
     }
   }
 }

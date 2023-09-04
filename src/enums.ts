@@ -14,6 +14,7 @@ export enum Timeouts {
 
 export enum LogsTypes {
   Error = 'ERROR',
+  ErrorMidpassTimeout = 'ERROR_MIDPASS_TIMEOUT',
   ErrorAutoupdateRoot = 'ERROR_AUTOUPDATE_ROOT',
   ErrorAutoupdateOrder = 'ERROR_AUTOUPDATE_ORDER',
   ErrorBlockByUser = 'ERROR_BLOCK_BY_USER',
@@ -27,6 +28,7 @@ export enum LogsTypes {
   ErrorUserNotFound = 'ERROR_USER_NOT_FOUND',
   ErrorUserNotAllowedToUpdateOrder = 'ERROR_USER_NOT_ALLOWED_TO_UPDATE_ORDER',
   ErrorOrderRequest = 'ERROR_ORDER_REQUEST',
+  ErrorOrderRequestMidpassNotFound = 'ERROR_ORDER_REQUEST_MIDPASS_NOT_FOUND',
   ErrorOrderValidate = 'ERROR_ORDER_VALIDATE',
   ErrorOrderDelete = 'ERROR_ORDER_DELETE',
   ErrorOrderNotFound = 'ERROR_ORDER_NOT_FOUND',

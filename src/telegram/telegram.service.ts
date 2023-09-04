@@ -16,7 +16,7 @@ import {
 import { MessageService } from 'src/message/message.service';
 import { BotService } from 'src/bot/bot.service';
 import { AutoupdateService } from 'src/autoupdate/autoupdate.service';
-import { Order } from 'src/orders/entity/order.entity';
+import { AppResponseService } from 'src/app-response/app-response.service';
 
 type TgContext = NarrowedContext<
   Context<Update>,
@@ -55,10 +55,11 @@ export class TelegramService {
     private readonly autoupdateService: AutoupdateService,
     private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
+    private readonly appResponseService: AppResponseService,
   ) {
     this.bot = this.botService.bot;
     this.initBot();
-    // this.autoupdateService.initCronjobs();
+    this.autoupdateService.initCronjobs();
   }
 
   private async initBot() {
@@ -69,9 +70,7 @@ export class TelegramService {
       if (usersCountResponse.success) {
         this.logger.log(
           LogsTypes.TgBotStart,
-          `UsersWithOrders: ${
-            ((usersCountResponse.data as User[]) || []).length
-          }`,
+          `UsersWithOrders: ${(usersCountResponse.data || []).length}`,
         );
       }
     }
@@ -110,7 +109,7 @@ export class TelegramService {
     if (!userResponse.success) {
       return;
     }
-    const user = userResponse.data as User;
+    const user = userResponse.data;
 
     switch (eventName) {
       case TgEvents.Start:
@@ -170,7 +169,7 @@ export class TelegramService {
             this.handleUserSubscribe(ctx, user);
             return;
           }
-          this.messageService.sendMessage(user, 'default');
+          await this.messageService.sendMessageToAdmin(ctx.message.text);
       }
     } catch (e) {
       this.logger.error(LogsTypes.Error, e);
@@ -240,9 +239,15 @@ export class TelegramService {
 
     const deletedOrderResponse = await this.ordersService.delete(uid, user);
     if (!deletedOrderResponse.success) {
+      await this.messageService.sendMessage(
+        user,
+        this.i18n.t('user_errors.message_order_unsubscribe', {
+          order: { uid },
+        }),
+      );
       return;
     }
-    const deletedOrder = deletedOrderResponse.data as Order;
+    const deletedOrder = deletedOrderResponse.data;
     this.logger.log(LogsTypes.TgUserUnsubscribed, user.id, {
       order: deletedOrder,
     });
@@ -250,7 +255,7 @@ export class TelegramService {
     if (!updatedUserResponse.success) {
       return;
     }
-    const updatedUser = updatedUserResponse.data as User;
+    const updatedUser = updatedUserResponse.data;
     const messageId = ctx.update.callback_query.message.message_id;
 
     await this.messageService.sendMessage(
@@ -287,10 +292,28 @@ export class TelegramService {
     const updatedUserResponse = await this.usersService.find(ctx.from);
 
     if (!orderResponse.success || !updatedUserResponse.success) {
+      if (
+        orderResponse.success === false &&
+        orderResponse.error === LogsTypes.ErrorMaxOrdersPerUser
+      ) {
+        await this.messageService.sendMessage(
+          user,
+          this.i18n.t('user_errors.message_max_orders_per_user', {
+            count: user.filteredOrders.length,
+          }),
+        );
+      } else {
+        await this.messageService.sendMessage(
+          user,
+          this.i18n.t('user_errors.message_order_subscribe', {
+            order: { uid },
+          }),
+        );
+      }
       return;
     }
-    const order = orderResponse.data as Order;
-    const updatedUser = updatedUserResponse.data as User;
+    const order = orderResponse.data;
+    const updatedUser = updatedUserResponse.data;
 
     if (order) {
       this.logger.log(LogsTypes.TgUserSubscribed, updatedUser.id, { order });
@@ -302,7 +325,12 @@ export class TelegramService {
       return;
     }
 
-    this.logger.log(LogsTypes.ErrorOrderValidate, updatedUser.id, { order });
+    this.appResponseService.error(
+      LogsTypes.ErrorOrderValidate,
+      updatedUser.id,
+      null,
+      { order },
+    );
     await this.messageService.sendMessage(
       updatedUser,
       this.i18n.t('user_errors.message_order_validate'),
@@ -323,7 +351,9 @@ export class TelegramService {
         });
         await this.messageService.sendMessageStatus(user, existingOrder);
       } else {
-        this.logger.error(LogsTypes.ErrorOrderNotFound, uid, { user });
+        this.appResponseService.error(LogsTypes.ErrorOrderNotFound, uid, null, {
+          user,
+        });
         await this.messageService.sendMessage(
           user,
           this.i18n.t('user_errors.message_order_not_found'),
@@ -332,7 +362,9 @@ export class TelegramService {
       return;
     }
 
-    this.logger.log(LogsTypes.ErrorOrderValidate, uid, { user });
+    this.appResponseService.error(LogsTypes.ErrorOrderValidate, uid, null, {
+      user,
+    });
     await this.messageService.sendMessage(
       user,
       this.i18n.t('user_errors.message_order_validate'),
@@ -346,7 +378,7 @@ export class TelegramService {
     if (!userToSendResponse.success) {
       return;
     }
-    const userToSend = userToSendResponse.data as User;
+    const userToSend = userToSendResponse.data;
 
     await this.messageService.sendMessage(userToSend, messageToUser, {
       disable_notification: true,
