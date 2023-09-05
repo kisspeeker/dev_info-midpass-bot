@@ -51,11 +51,7 @@ export class AutoupdateService {
   private async handleAutoupdateOrders() {
     const startDate = new Date();
     const counter = this.initAutoupdateCounter();
-    this.appResponseService.success(
-      LogsTypes.AutoupdateStart,
-      `${startDate}`,
-      null,
-    );
+    this.appResponseService.success(LogsTypes.AutoupdateStart, `${startDate}`);
 
     try {
       const ordersResponse = await this.ordersService.getAllFiltered();

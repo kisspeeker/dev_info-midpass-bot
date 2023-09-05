@@ -1,10 +1,10 @@
 import { Global, Module } from '@nestjs/common';
 import { AppResponseService } from 'src/app-response/app-response.service';
-import { NotificationModule } from 'src/notification/notification.module';
+import { BotModule } from 'src/bot/bot.module';
 
 @Global()
 @Module({
-  imports: [NotificationModule],
+  imports: [BotModule],
   providers: [AppResponseService],
   exports: [AppResponseService],
 })

@@ -5,11 +5,33 @@ import { Injectable } from '@nestjs/common';
 import { TG_RATE_LIMIT } from 'src/constants';
 import { BotCommands } from 'src/enums';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
-import { Telegraf } from 'telegraf';
+import { Context, NarrowedContext, Telegraf, session } from 'telegraf';
+import {
+  CallbackQuery,
+  Message,
+  Update,
+} from 'telegraf/typings/core/types/typegram';
+
+interface SessionData {
+  awaitingSupportMessage: boolean;
+}
+
+export interface AppContext extends Context {
+  session?: SessionData;
+  message: Update.New & Update.NonChannel & Message.TextMessage;
+}
+
+export type AppContextAction = NarrowedContext<
+  Context<Update> & {
+    match: RegExpExecArray;
+  },
+  Update.CallbackQueryUpdate<CallbackQuery>
+>;
 
 @Injectable()
 export class BotService {
   public bot: Telegraf;
+  private adminId: string = process.env.TG_ADMIN_ID;
   private isUnderConstruction: boolean =
     process.env.IS_UNDER_CONSTRUCTION === 'true';
 
@@ -17,41 +39,39 @@ export class BotService {
     const rateLimitMiddleware = rateLimit({
       window: TG_RATE_LIMIT,
       limit: 1,
-      onLimitExceeded: (ctx) =>
-        ctx.reply(this.i18n.t('user_errors.message_rate_limit')),
+      onLimitExceeded: (ctx) => {
+        ctx.reply(this.i18n.t('user_errors.message_rate_limit'));
+        this.notify(this.i18n.t('admin.user_spaming', { id: ctx.from.id }));
+      },
     });
 
-    this.bot = new Telegraf(process.env.TG_BOT_TOKEN);
+    this.bot = new Telegraf<AppContext>(process.env.TG_BOT_TOKEN, {
+      telegram: { webhookReply: false },
+    });
     this.bot.use(rateLimitMiddleware);
+    this.bot.use(
+      session({ defaultSession: () => ({ awaitingSupportMessage: false }) }),
+    );
+  }
+
+  async notify(message: string) {
+    try {
+      await this.bot.telegram.sendMessage(this.adminId, message, {
+        parse_mode: 'HTML',
+      });
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   }
 
   get botCommands() {
-    return [
-      {
-        command: BotCommands.Start,
-        description: this.i18n.t('user.command_start'),
-      },
-      {
-        command: BotCommands.Help,
-        description: this.i18n.t('user.command_help'),
-      },
-      {
-        command: BotCommands.FaqBase,
-        description: this.i18n.t('user.command_faq'),
-      },
-      {
-        command: BotCommands.FaqStatuses,
-        description: this.i18n.t('user.command_statuses'),
-      },
-      {
-        command: BotCommands.Schedule,
-        description: this.i18n.t('user.command_schedule'),
-      },
-      {
-        command: BotCommands.Contacts,
-        description: this.i18n.t('user.command_contacts'),
-      },
-    ];
+    return Object.values(BotCommands).map((command) => {
+      return {
+        command,
+        description: this.i18n.t(`user.command_${command}`),
+      };
+    });
   }
 
   async startBot() {

@@ -20,7 +20,6 @@ import { MessageModule } from 'src/message/message.module';
 import { BotModule } from 'src/bot/bot.module';
 import { AutoupdateModule } from 'src/autoupdate/autoupdate.module';
 import { AppResponseModule } from 'src/app-response/app-response.module';
-import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -58,7 +57,6 @@ import { NotificationModule } from 'src/notification/notification.module';
     BotModule,
     AutoupdateModule,
     AppResponseModule,
-    NotificationModule,
   ],
 })
 export class AppModule {

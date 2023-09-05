@@ -32,6 +32,7 @@ export class UsersService {
         LogsTypes.DbUserCreated,
         newUser.id,
         newUser,
+        { user: newUser },
       );
     } catch (e) {
       return await this.appResponseService.error<User>(
@@ -84,23 +85,30 @@ export class UsersService {
     }
   }
 
-  async find(createUserDto: CreateUserDto) {
+  async find(createUserDto: CreateUserDto, createIfNotFound = false) {
     try {
       let user = await this.usersRepository.findOne({
         where: { id: String(createUserDto.id) },
         relations: ['orders'],
       });
 
+      if (!user && createUserDto.username) {
+        user = await this.usersRepository.findOne({
+          where: { userName: createUserDto.username },
+          relations: ['orders'],
+        });
+      }
+
       if (!user) {
-        this.appResponseService.error(
-          LogsTypes.ErrorUserNotFound,
-          String(createUserDto.id),
-        );
-        const newUserResponse = await this.create(createUserDto);
-        if (newUserResponse.success === false) {
-          throw newUserResponse;
+        if (createIfNotFound) {
+          const newUserResponse = await this.create(createUserDto);
+          if (newUserResponse.success === false) {
+            throw newUserResponse;
+          }
+          user = newUserResponse.data;
+        } else {
+          throw LogsTypes.ErrorUserNotFound;
         }
-        user = (await this.create(createUserDto)).data;
       }
 
       return this.appResponseService.success(
@@ -110,8 +118,62 @@ export class UsersService {
       );
     } catch (e) {
       return await this.appResponseService.error<User>(
-        LogsTypes.ErrorUserFind,
         e,
+        'error in users.service.find',
+        null,
+        { user: createUserDto },
+      );
+    }
+  }
+
+  async block(createUserDto: CreateUserDto) {
+    try {
+      const userResponse = await this.find(createUserDto);
+      if (!userResponse.success) {
+        throw LogsTypes.ErrorUserNotFound;
+      }
+      const user = userResponse.data;
+      if (user.isAdmin) {
+        throw LogsTypes.ErrorUserNotFound;
+      }
+      user.isBlocked = true;
+      await this.usersRepository.save(user);
+      return this.appResponseService.success(LogsTypes.DbUserBlocked, user.id, {
+        user,
+      });
+    } catch (e) {
+      return await this.appResponseService.error<User>(
+        e,
+        'error in users.service.block',
+        null,
+        { user: createUserDto },
+      );
+    }
+  }
+
+  async unblock(createUserDto: CreateUserDto) {
+    try {
+      const userResponse = await this.find(createUserDto);
+      if (!userResponse.success) {
+        throw LogsTypes.ErrorUserNotFound;
+      }
+      const user = userResponse.data;
+      if (user.isAdmin) {
+        throw LogsTypes.ErrorUserNotFound;
+      }
+      user.isBlocked = false;
+      await this.usersRepository.save(user);
+      return this.appResponseService.success(
+        LogsTypes.DbUserUnblocked,
+        user.id,
+        { user },
+      );
+    } catch (e) {
+      return await this.appResponseService.error<User>(
+        e,
+        'error in users.service.unblock',
+        null,
+        { user: createUserDto },
       );
     }
   }

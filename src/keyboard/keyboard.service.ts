@@ -48,4 +48,19 @@ export class KeyboardService {
     }
     return res.length ? Markup.inlineKeyboard.bind(this)(res).resize() : [];
   }
+
+  useKeyboardInlineOrders(user: User): Markup.Markup<InlineKeyboardMarkup> {
+    const res = [];
+    if (user && user.filteredOrders.length) {
+      user.filteredOrders.forEach((order) =>
+        res.push([
+          Markup.button.callback(
+            this.i18n.t('user.button_status_order', { order }),
+            `status ${order.uid}`,
+          ),
+        ]),
+      );
+    }
+    return res.length ? Markup.inlineKeyboard.bind(this)(res).resize() : [];
+  }
 }

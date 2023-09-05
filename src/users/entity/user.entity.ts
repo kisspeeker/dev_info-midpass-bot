@@ -11,6 +11,8 @@ import { Order } from 'src/orders/entity/order.entity';
 
 @Entity()
 export class User {
+  private adminId: string = process.env.TG_ADMIN_ID;
+
   @PrimaryColumn()
   id: string;
 
@@ -23,6 +25,9 @@ export class User {
   @Column()
   userName: string;
 
+  @Column({ nullable: true })
+  isBlocked: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -34,5 +39,9 @@ export class User {
 
   get filteredOrders() {
     return this.orders.filter((order) => !order.isDeleted);
+  }
+
+  get isAdmin() {
+    return this.id === this.adminId;
   }
 }

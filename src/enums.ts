@@ -20,10 +20,10 @@ export enum LogsTypes {
   ErrorAutoupdateOrder = 'ERROR_AUTOUPDATE_ORDER',
   ErrorBlockByUser = 'ERROR_BLOCK_BY_USER',
   ErrorUserSendMessage = 'ERROR_USER_SEND_MESSAGE',
-  ErrorUserSendMessageInline = 'ERROR_USER_SEND_MESSAGE_INLINE',
+  ErrorUserSendMessageInlineOrders = 'ERROR_USER_SEND_MESSAGE_INLINE_STATUSES',
+  ErrorUserSendMessageInlineUnsubscribe = 'ERROR_USER_SEND_MESSAGE_INLINE_UNSUBSCRIBE',
   ErrorUserSendMessageStatus = 'ERROR_USER_SEND_MESSAGE_STATUS',
   ErrorUserCreate = 'ERROR_USER_CREATE',
-  ErrorUserFind = 'ERROR_USER_FIND',
   ErrorUsersFindAll = 'ERROR_USERS_FIND_ALL',
   ErrorUsersFindWithOrders = 'ERROR_USERS_FIND_WITH_ORDERS',
   ErrorUserNotFound = 'ERROR_USER_NOT_FOUND',
@@ -40,6 +40,8 @@ export enum LogsTypes {
 
   DbUserCreated = 'DB_USER_CREATED',
   DbUserGet = 'DB_USER_GET',
+  DbUserBlocked = 'DB_USER_BLOCKED',
+  DbUserUnblocked = 'DB_USER_UNBLOCKED',
   DbUsersGetAll = 'DB_USERS_GET_ALL',
   DbUsersGetAllWithOrders = 'DB_USERS_GET_ALL_WITH_ORDERS',
   DbOrderCreated = 'DB_ORDER_CREATED',
@@ -50,8 +52,15 @@ export enum LogsTypes {
   DbOrdersGetAllFiltered = 'DB_ORDERS_GET_ALL_FILTERED',
   DbOrderAuditCreated = 'DB_ORDER_AUDIT_CREATED',
 
+  TgMessageSent = 'TG_MESSAGE_SENT',
+  TgOrdersSent = 'TG_ORDERS_SENT',
+  TgStatusSent = 'TG_STATUS_SENT',
+  TgUnsubscribeSent = 'TG_UNSUBSCRIBE_SENT',
+  TgAdminMessageSent = 'TG_ADMIN_MESSAGE_SENT',
+
   TgBotStart = 'TG_BOT_START',
   TgUserStart = 'TG_USER_START',
+  TgUserSupport = 'TG_USER_SUPPORT',
   TgUserUnsubscribed = 'TG_USER_UNSUBSCRIBED',
   TgUserSubscribed = 'TG_USER_SUBSCRIBED',
   TgUserSubscribedAlready = 'TG_USER_SUBSCRIBED_ALREADY',
@@ -67,9 +76,23 @@ export enum LogsTypes {
   AutoupdateEnd = 'AUTOUPDATE_END',
 }
 
+export enum AdminCommands {
+  Send = 'send',
+  Block = 'block',
+  Unblock = 'unblock',
+  Test = 'test',
+}
+
+export const AdminCommandsDescription = {
+  [AdminCommands.Send]: 'Отправить сообщение пользователю [id, @username]',
+  [AdminCommands.Block]: 'Заблокировать пользователя [id, @username]',
+  [AdminCommands.Unblock]: 'Разблокировать пользователя [id, @username]',
+  [AdminCommands.Test]: 'AdminCommands.Test',
+};
+
 export enum TextCommands {
-  AdminSend = 'написать',
-  AdminTest = 'test',
+  Admin = '/admin',
+  Admin1 = '/админ',
 
   Unsubscribe = 'отписаться',
   Status = 'статус',
@@ -78,9 +101,10 @@ export enum TextCommands {
 
 export enum BotCommands {
   Start = 'start',
-  Help = 'help',
+  Support = 'support',
   FaqBase = 'faq',
-  FaqStatuses = 'statuses',
+  FaqStatuses = 'faq_statuses',
   Schedule = 'schedule',
   Contacts = 'contacts',
+  OrdersList = 'orders_list',
 }

@@ -1,9 +1,37 @@
 {
-  "new_user": [
+  "user_spaming": [
+    "⚠️ Пользователь <code>{id}</code> спамит"
+  ],
+  "tg_admin_message_sent": [
+    "✅ Успешно написал пользователю <code>{user.id}</code>"
+  ],
+  "db_user_blocked": [
+    "🚫 Пользователь <code>{id}</code> заблокирован"
+  ],
+  "db_user_unblocked": [
+    "✅ Пользователь <code>{id}</code> разблокирован"
+  ],
+  "user_message": [
+    "ℹ️ Сообщение от пользователя <code>{user.id}</code>:\n\n",
+    "<em>{message}</em>"
+  ],
+  "db_user_created": [
     "🆕 Новый пользователь! \n\n",
     "<b>id:</b> <code>{user.id}</code>\n",
     "<b>userName:</b> {user.userName}\n",
     "<b>firstName:</b> {user.firstName}\n",
     "<b>lastName:</b> {user.lastName}"
+  ],
+  "error_user_not_found": [
+    "❌ Пользователь не найден <code>{user.id}</code>"
+  ],
+  "error_block_by_user": [
+    "❌ Bot was blocked by the user <code>{user.id}</code>. Он больше не выпадает в выдаче, его заявления удалены"
+  ],
+  "error_command_not_found": [
+    "❌ Такой команды не существует"
+  ],
+  "error_user_send_message": [
+    "❌ Не удалось отправить сообщение пользователю <code>{user.id}</code>"
   ]
 }

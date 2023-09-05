@@ -7,7 +7,6 @@ import { OrdersModule } from 'src/orders/orders.module';
 import { MessageModule } from 'src/message/message.module';
 import { BotModule } from 'src/bot/bot.module';
 import { AutoupdateModule } from 'src/autoupdate/autoupdate.module';
-import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
   imports: [
@@ -16,7 +15,6 @@ import { NotificationModule } from 'src/notification/notification.module';
     OrdersModule,
     MessageModule,
     AutoupdateModule,
-    NotificationModule,
     HttpModule,
   ],
   providers: [TelegramService],

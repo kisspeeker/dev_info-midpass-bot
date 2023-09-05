@@ -1,50 +1,33 @@
 import { Injectable } from '@nestjs/common';
-import { Context, NarrowedContext, Telegraf } from 'telegraf';
+import { Context, Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 
-import { BotCommands, LogsTypes, TextCommands } from 'src/enums';
-import { LoggerService } from 'src/logger/logger.service';
+import {
+  AdminCommands,
+  AdminCommandsDescription,
+  BotCommands,
+  LogsTypes,
+  TextCommands,
+} from 'src/enums';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 import { OrdersService } from 'src/orders/orders.service';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entity/user.entity';
-import {
-  CallbackQuery,
-  Message,
-  Update,
-} from 'telegraf/typings/core/types/typegram';
 import { MessageService } from 'src/message/message.service';
-import { BotService } from 'src/bot/bot.service';
+import { AppContext, AppContextAction, BotService } from 'src/bot/bot.service';
 import { AutoupdateService } from 'src/autoupdate/autoupdate.service';
 import { AppResponseService } from 'src/app-response/app-response.service';
-import { NotificationService } from 'src/notification/notification.service';
-
-type TgContext = NarrowedContext<
-  Context<Update>,
-  {
-    message: Update.New & Update.NonChannel & Message.TextMessage;
-    update_id: number;
-  }
->;
-
-type TgContextAction = NarrowedContext<
-  Context<Update> & {
-    message: Update.New & Update.NonChannel & Message.TextMessage;
-    match: RegExpExecArray;
-  },
-  Update.CallbackQueryUpdate<CallbackQuery>
->;
 
 enum TgEvents {
   Start = 'Start',
   Text = 'Text',
-  Action = 'Action',
+  ActionStatus = 'ActionStatus',
+  ActionUnsubscribe = 'ActionUnsubscribe',
 }
 
 @Injectable()
 export class TelegramService {
   private bot: Telegraf;
-  private adminId: string = process.env.TG_ADMIN_ID;
   private isUnderConstruction: boolean =
     process.env.IS_UNDER_CONSTRUCTION === 'true';
 
@@ -53,9 +36,7 @@ export class TelegramService {
     private readonly usersService: UsersService,
     private readonly ordersService: OrdersService,
     private readonly messageService: MessageService,
-    private readonly notificationService: NotificationService,
     private readonly autoupdateService: AutoupdateService,
-    private readonly logger: LoggerService,
     private readonly i18n: CustomI18nService,
     private readonly appResponseService: AppResponseService,
   ) {
@@ -69,7 +50,6 @@ export class TelegramService {
       this.appResponseService.success(
         LogsTypes.TgBotStart,
         'isUnderConstruction',
-        null,
       );
     } else {
       const usersCountResponse = await this.usersService.findAllWithOrders();
@@ -77,27 +57,30 @@ export class TelegramService {
         this.appResponseService.success(
           LogsTypes.TgBotStart,
           `UsersWithOrders: ${(usersCountResponse.data || []).length}`,
-          null,
         );
       }
     }
 
-    this.bot.start((ctx: TgContext) => {
+    this.bot.start((ctx) => {
       this.handleUserEvent(ctx, TgEvents.Start);
     });
 
     for (const command of this.botService.botCommands) {
-      this.bot.command(command.command, (ctx: TgContext) => {
+      this.bot.command(command.command, (ctx) => {
         this.handleUserEvent(ctx, command.command);
       });
     }
 
-    this.bot.on(message('text'), (ctx: TgContext) => {
+    this.bot.on(message('text'), (ctx) => {
       this.handleUserEvent(ctx, TgEvents.Text);
     });
 
-    this.bot.action(/unsubscribe (.+)/, (ctx: TgContextAction) => {
-      this.handleUserEvent(ctx, TgEvents.Action);
+    this.bot.action(/unsubscribe (.+)/, (ctx) => {
+      this.handleUserEvent(ctx, TgEvents.ActionUnsubscribe);
+    });
+
+    this.bot.action(/status (.+)/, (ctx) => {
+      this.handleUserEvent(ctx, TgEvents.ActionStatus);
     });
 
     this.bot.catch((e) => {
@@ -111,50 +94,65 @@ export class TelegramService {
   }
 
   private async handleUserEvent(
-    ctx: TgContext | TgContextAction,
+    ctx: AppContext | AppContextAction,
     eventName: TgEvents | BotCommands,
   ) {
+    // если не потрогать сессию здесь, то она стирается до выполнения методов
+    const isAwaitingSupportMessage = (ctx as AppContext).session
+      .awaitingSupportMessage;
+
     if (await this.handleCheckUnderConstruction(ctx)) {
       return;
     }
-    const userResponse = await this.usersService.find(ctx.from);
+    const userResponse = await this.usersService.find(ctx.from, true);
     if (!userResponse.success) {
       return;
     }
     const user = userResponse.data;
+    if (user.isBlocked) {
+      return;
+    }
 
     switch (eventName) {
       case TgEvents.Start:
       case BotCommands.Start:
-        this.handleUserStart(ctx as TgContext, user);
+        this.handleUserStart(ctx as AppContext, user);
         break;
-      case BotCommands.Help:
+      case BotCommands.Support:
+        this.handleUserSupport(ctx as AppContext, user);
+        break;
       case BotCommands.FaqBase:
-        this.handleUserFaqBase(ctx as TgContext, user);
+        this.handleUserFaqBase(ctx as AppContext, user);
         break;
       case BotCommands.FaqStatuses:
-        this.handleUserFaqStatuses(ctx as TgContext, user);
+        this.handleUserFaqStatuses(ctx as AppContext, user);
         break;
       case BotCommands.Contacts:
-        this.handleUserContacts(ctx as TgContext, user);
+        this.handleUserContacts(ctx as AppContext, user);
         break;
       case BotCommands.Schedule:
-        this.handleUserSchedule(ctx as TgContext, user);
+        this.handleUserSchedule(ctx as AppContext, user);
         break;
-      case TgEvents.Action:
-        this.handleUserActionUnsubscribe(ctx as TgContextAction, user);
+      case BotCommands.OrdersList:
+        this.handleUserOrdersList(ctx as AppContext, user);
+        break;
+      case TgEvents.ActionStatus:
+        this.handleUserActionStatus(ctx as AppContextAction, user);
+        break;
+      case TgEvents.ActionUnsubscribe:
+        this.handleUserActionUnsubscribe(ctx as AppContextAction, user);
         break;
       case TgEvents.Text:
-        this.handleUserText(ctx as TgContext, user);
+        this.handleUserText(ctx as AppContext, user);
         break;
       default:
-        this.handleUserText(ctx as TgContext, user);
+        this.handleUserText(ctx as AppContext, user);
         break;
     }
   }
 
-  private async handleUserText(ctx: TgContext, user: User) {
-    const text = String(ctx.message.text).toLowerCase();
+  private async handleUserText(ctx: AppContext, user: User) {
+    const text = String(ctx.message?.text).toLowerCase();
     const textCommand = String(text.split(' ')[0]).trim();
 
     try {
@@ -166,29 +164,132 @@ export class TelegramService {
         case TextCommands.StatusUpdate:
           this.handleUserStatus(ctx, user);
           break;
-        case TextCommands.AdminSend:
-          if (user.id === this.adminId) {
-            this.handleAdminSend(ctx);
-            break;
-          }
-        case TextCommands.AdminTest:
-          if (user.id === this.adminId) {
-            this.handleAdminTest(ctx, user);
-            break;
-          }
+        case TextCommands.Admin:
+        case TextCommands.Admin1:
+          this.handleAdminCommands(ctx, user);
+          break;
         default:
+          if (ctx.session.awaitingSupportMessage) {
+            await this.botService.notify(
+              this.i18n.t('admin.user_message', {
+                user,
+                message: ctx.message.text,
+              }),
+            );
+            await this.messageService.sendMessage(
+              user,
+              this.i18n.t('user.message_support_sent'),
+            );
+            return;
+          }
           if (OrdersService.isValidUid(textCommand)) {
             this.handleUserSubscribe(ctx, user);
             return;
           }
-          this.notificationService.sendMessageToAdmin(ctx.message.text);
+      }
+    } catch (e) {
+      this.appResponseService.error(LogsTypes.Error, e);
+    } finally {
+      ctx.session.awaitingSupportMessage = false;
+    }
+  }
+
+  private async handleAdminCommands(ctx: AppContext, user: User) {
+    if (!user.isAdmin) {
+      return;
+    }
+
+    const text = String(ctx.message.text).toLowerCase();
+    const textCommand = text.split(' ')[1]?.trim();
+
+    try {
+      switch (textCommand) {
+        case AdminCommands.Send:
+          this.handleAdminSend(ctx);
+          break;
+        case AdminCommands.Block:
+          this.handleAdminBlock(ctx);
+          break;
+        case AdminCommands.Unblock:
+          this.handleAdminUnblock(ctx);
+          break;
+        default:
+          if (!textCommand) {
+            this.handleAdminShowList(ctx);
+            break;
+          }
+          this.botService.notify(this.i18n.t('admin.error_command_not_found'));
       }
     } catch (e) {
       this.appResponseService.error(LogsTypes.Error, e);
     }
   }
 
-  private async handleCheckUnderConstruction(ctx: TgContext | TgContextAction) {
+  private async handleAdminShowList(ctx: AppContext) {
+    this.botService.notify(
+      Object.entries(AdminCommandsDescription)
+        .map(
+          ([command, description]) =>
+            `<code>${TextCommands.Admin} ${command} </code> \n <em>${description}</em>`,
+        )
+        .join('\n\n'),
+    );
+  }
+
+  private async handleAdminBlock(ctx: AppContext) {
+    const userId = ctx.message.text.split(' ')[2];
+    await this.usersService.block({ id: userId });
+  }
+
+  private async handleAdminUnblock(ctx: AppContext) {
+    const userId = ctx.message.text.split(' ')[2];
+    await this.usersService.unblock({ id: userId });
+  }
+
+  private async handleAdminSend(ctx: AppContext) {
+    const userIdOrUsername = ctx.message.text.split(' ')[2];
+    const messageToUser = ctx.message.text.split(' ').slice(3).join(' ');
+
+    try {
+      const userToSendResponse = await this.usersService.find({
+        id: userIdOrUsername,
+        username: userIdOrUsername,
+      });
+
+      if (!userToSendResponse.success) {
+        return;
+      }
+
+      const userToSend = userToSendResponse.data;
+
+      const messageResponse = await this.messageService.sendMessage(
+        userToSend,
+        messageToUser,
+        {
+          disable_notification: true,
+        },
+      );
+      if (messageResponse.success === true) {
+        await this.appResponseService.success(
+          LogsTypes.TgAdminMessageSent,
+          userToSend.id,
+          null,
+          { user: userToSend, messageToUser },
+        );
+      }
+    } catch (e) {
+      this.appResponseService.error(
+        e,
+        this.i18n.t('admin.error_user_send_message', { userIdOrUsername }),
+        { userIdOrUsername },
+        { userIdOrUsername },
+      );
+    }
+  }
+
+  private async handleCheckUnderConstruction(
+    ctx: AppContext | AppContextAction,
+  ) {
     if (this.isUnderConstruction) {
       this.bot.telegram.sendMessage(
         ctx.from.id,
@@ -199,48 +300,58 @@ export class TelegramService {
         },
       );
     }
+
     return this.isUnderConstruction;
   }
 
-  private async handleUserStart(ctx: TgContext, user: User) {
-    this.appResponseService.success(LogsTypes.TgUserStart, user.id, null);
+  private async handleUserStart(ctx: AppContext, user: User) {
+    this.appResponseService.success(LogsTypes.TgUserStart, user.id);
     this.messageService.sendMessage(user, this.i18n.t('user.message_start'));
   }
 
-  private async handleUserFaqBase(ctx: TgContext, user: User) {
-    this.appResponseService.success(LogsTypes.TgUserFaqBase, user.id, null);
+  private async handleUserSupport(ctx: AppContext, user: User) {
+    await this.appResponseService.success(LogsTypes.TgUserSupport, user.id);
+    await this.messageService.sendMessage(
+      user,
+      this.i18n.t('user.message_support'),
+    );
+    ctx.session.awaitingSupportMessage = true;
+  }
+
+  private async handleUserFaqBase(ctx: AppContext, user: User) {
+    this.appResponseService.success(LogsTypes.TgUserFaqBase, user.id);
     this.messageService.sendMessage(user, this.i18n.t('user.message_faq_base'));
   }
 
-  private async handleUserFaqStatuses(ctx: TgContext, user: User) {
-    this.appResponseService.success(LogsTypes.TgUserFaqStatuses, user.id, null);
+  private async handleUserFaqStatuses(ctx: AppContext, user: User) {
+    this.appResponseService.success(LogsTypes.TgUserFaqStatuses, user.id);
     this.messageService.sendMessage(
       user,
       this.i18n.t('user.message_faq_statuses'),
     );
   }
 
-  private async handleUserContacts(ctx: TgContext, user: User) {
-    this.appResponseService.success(LogsTypes.TgUserContacts, user.id, null);
+  private async handleUserContacts(ctx: AppContext, user: User) {
+    this.appResponseService.success(LogsTypes.TgUserContacts, user.id);
     this.messageService.sendMessage(
       user,
       this.i18n.t('user.message_contacts') + this.i18n.t('user.message_donate'),
     );
   }
 
-  private async handleUserSchedule(ctx: TgContext, user: User) {
-    this.appResponseService.success(LogsTypes.TgUserSchedule, user.id, null);
+  private async handleUserSchedule(ctx: AppContext, user: User) {
+    this.appResponseService.success(LogsTypes.TgUserSchedule, user.id);
     this.messageService.sendMessage(
       user,
       this.i18n.t('user.message_autoupdate_schedules'),
     );
   }
 
-  private async handleUserUnsubscribe(ctx: TgContext, user: User) {
-    this.messageService.sendMessageInline(user);
+  private async handleUserUnsubscribe(ctx: AppContext, user: User) {
+    this.messageService.sendMessageInlineUnsubscribe(user);
   }
 
-  private async handleUserActionUnsubscribe(ctx: TgContextAction, user: User) {
+  private async handleUserActionUnsubscribe(ctx: AppContextAction, user: User) {
     const uid = ctx.match[1];
 
     const deletedOrderResponse = await this.ordersService.delete(uid, user);
@@ -281,7 +392,7 @@ export class TelegramService {
     }
   }
 
-  private async handleUserSubscribe(ctx: TgContext, user: User) {
+  private async handleUserSubscribe(ctx: AppContext, user: User) {
     const uid = String(ctx.message.text.split(' ')[0]).trim();
     const existingOrder = user.filteredOrders.find(
       (order) => order.uid === uid,
@@ -305,8 +416,8 @@ export class TelegramService {
     }
 
     const [orderResponse, updatedUserResponse] = await Promise.all([
-      this.ordersService.create({ uid }, user),
-      this.usersService.find(ctx.from),
+      await this.ordersService.create({ uid }, user),
+      await this.usersService.find(ctx.from),
     ]);
 
     if (!orderResponse.success || !updatedUserResponse.success) {
@@ -356,8 +467,25 @@ export class TelegramService {
     );
   }
 
-  private async handleUserStatus(ctx: TgContext, user: User) {
-    const uid = String(ctx.message.text.split(' ')[1]).trim();
+  private async handleUserOrdersList(ctx: AppContext, user: User) {
+    this.messageService.sendMessageInlineOrders(user);
+  }
+
+  private async handleUserActionStatus(ctx: AppContextAction, user: User) {
+    const uid = ctx.match[1];
+    await this.handleUserStatus(uid, user);
+
+    const messageId = ctx.update.callback_query.message.message_id;
+    if (messageId) {
+      this.bot.telegram.deleteMessage(user.id, messageId);
+    }
+  }
+
+  private async handleUserStatus(ctxOrUid: string | AppContext, user: User) {
+    const uid =
+      typeof ctxOrUid === 'string'
+        ? ctxOrUid
+        : String(ctxOrUid?.message?.text.split(' ')[1].trim());
 
     if (OrdersService.isValidUid(uid) || OrdersService.isValidUidShort(uid)) {
       const existingOrder = user.filteredOrders.find(
@@ -393,23 +521,5 @@ export class TelegramService {
       user,
       this.i18n.t('user_errors.message_order_validate'),
     );
-  }
-
-  private async handleAdminSend(ctx: TgContext) {
-    const userId = ctx.message.text.split(' ')[1];
-    const messageToUser = ctx.message.text.split(' ').slice(2).join(' ');
-    const userToSendResponse = await this.usersService.find({ id: userId });
-    if (!userToSendResponse.success) {
-      return;
-    }
-    const userToSend = userToSendResponse.data;
-
-    this.messageService.sendMessage(userToSend, messageToUser, {
-      disable_notification: true,
-    });
-  }
-
-  private async handleAdminTest(ctx: TgContext, user: User) {
-    this.messageService.sendMessage(user, 'Тестовая команда для админа');
   }
 }

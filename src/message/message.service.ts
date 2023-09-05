@@ -19,8 +19,31 @@ export class MessageService {
     private readonly i18n: CustomI18nService,
     private readonly keyboardService: KeyboardService,
     private readonly appResponseService: AppResponseService,
+    private readonly ordersService: OrdersService,
   ) {
     this.bot = this.botService.bot;
+  }
+
+  async checkBlockedUser(e, user: User) {
+    const isBlockedUser =
+      e &&
+      e.response &&
+      e.response.error_code &&
+      e.on &&
+      e.on.payload &&
+      e.on.payload.chat_id;
+
+    if (isBlockedUser) {
+      await this.ordersService.deleteAll(user);
+      return await this.appResponseService.error(
+        LogsTypes.ErrorBlockByUser,
+        e,
+        {
+          user,
+        },
+      );
+    }
+    return false;
   }
 
   async sendMessage(
@@ -37,12 +60,49 @@ export class MessageService {
         ...this.keyboardService.useKeyboardDefault(user),
         ...extra,
       });
+      return this.appResponseService.success(LogsTypes.TgMessageSent, user.id, {
+        user,
+      });
     } catch (e) {
-      this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e);
+      const isBlockerUser = await this.checkBlockedUser(e, user);
+
+      if (isBlockerUser) {
+        return isBlockerUser;
+      }
+      return this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e, {
+        user,
+      });
     }
   }
 
-  async sendMessageInline(user: User) {
+  async sendMessageInlineOrders(user: User) {
+    try {
+      await this.bot.telegram.sendMessage(
+        user.id,
+        user.filteredOrders.length
+          ? this.i18n.t('user.message_orders_list')
+          : this.i18n.t('user.message_orders_list_empty'),
+        {
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...this.keyboardService.useKeyboardInlineOrders(user),
+        },
+      );
+      return this.appResponseService.success(LogsTypes.TgOrdersSent, user.id);
+    } catch (e) {
+      const isBlockerUser = await this.checkBlockedUser(e, user);
+
+      if (isBlockerUser) {
+        return isBlockerUser;
+      }
+      return this.appResponseService.error(
+        LogsTypes.ErrorUserSendMessageInlineOrders,
+        e,
+      );
+    }
+  }
+
+  async sendMessageInlineUnsubscribe(user: User) {
     try {
       await this.bot.telegram.sendMessage(
         user.id,
@@ -53,8 +113,20 @@ export class MessageService {
           ...this.keyboardService.useKeyboardInlineUnsubscribe(user),
         },
       );
+      return this.appResponseService.success(
+        LogsTypes.TgUnsubscribeSent,
+        user.id,
+      );
     } catch (e) {
-      this.appResponseService.error(LogsTypes.ErrorUserSendMessageInline, e);
+      const isBlockerUser = await this.checkBlockedUser(e, user);
+
+      if (isBlockerUser) {
+        return isBlockerUser;
+      }
+      return this.appResponseService.error(
+        LogsTypes.ErrorUserSendMessageInlineUnsubscribe,
+        e,
+      );
     }
   }
 
@@ -96,8 +168,17 @@ export class MessageService {
           ...this.keyboardService.useKeyboardDefault(user),
         },
       );
+      return this.appResponseService.success(LogsTypes.TgStatusSent, user.id);
     } catch (e) {
-      this.appResponseService.error(LogsTypes.ErrorUserSendMessageStatus, e);
+      const isBlockerUser = await this.checkBlockedUser(e, user);
+
+      if (isBlockerUser) {
+        return isBlockerUser;
+      }
+      return this.appResponseService.error(
+        LogsTypes.ErrorUserSendMessageStatus,
+        e,
+      );
     }
   }
 }
