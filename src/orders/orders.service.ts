@@ -233,6 +233,10 @@ export class OrdersService {
     }
   }
 
+  async findAuditLogs(orderUid: string) {
+    return await this.ordersAuditLogRepository.findBy({ orderUid });
+  }
+
   async update(existingOrder: Order, userId: string) {
     try {
       const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
@@ -286,6 +290,24 @@ export class OrdersService {
       return await this.appResponseService.error<Order[]>(
         LogsTypes.Error,
         'error in orders.service.findAll',
+      );
+    }
+  }
+
+  async find(uid: string) {
+    try {
+      const order = await this.ordersRepository.findOneBy({
+        uid,
+      });
+      return await this.appResponseService.success(
+        LogsTypes.DbOrderFind,
+        order.uid,
+        order,
+      );
+    } catch (e) {
+      return await this.appResponseService.error<Order>(
+        LogsTypes.Error,
+        'error in orders.service.find',
       );
     }
   }

@@ -1,4 +1,7 @@
 {
+  "separator": [
+    "\n\n========================\n\n"
+  ],
   "fallback": [
     "⚠️ {type} \n",
     "<em>{error}</em> \n",
@@ -15,6 +18,21 @@
     "ℹ️ <b>lastName:</b>\n",
     " └ {user.lastName}\n\n",
     "{ordersBeauty}"
+  ],
+  "order_audit_log_beauty": [
+    "<b>updatedAt:</b> {orderAuditLog.updatedAtTimeString}\n",
+    "<b>id:</b> {orderAuditLog.id}\n",
+    "<b>newStatusName:</b> {orderAuditLog.newStatusName}\n",
+    "<b>newStatusInternalName:</b> {orderAuditLog.newStatusInternalName}\n",
+    "<b>newStatusPercent:</b> {orderAuditLog.newStatusPercent}\n",
+    "<b>isDeleted:</b> {orderAuditLog.isDeleted}"
+  ],
+  "order_userid": [
+    "<b>🕵‍♀ Пользователь:</b>\n",
+    " └ <code>{order.userId}</code>"
+  ],
+  "db_user_created": [
+    "🆕 <em>Новый пользователь!</em> \n\n"
   ],
   "user_spaming": [
     "⚠️ <em>Пользователь <code>{id}</code> спамит</em>"
@@ -40,10 +58,6 @@
   "user_message": [
     "ℹ️ <em>Сообщение от пользователя <code>{user.id}</code>:</em>\n\n",
     "{message}"
-  ],
-  "db_user_created": [
-    "🆕 <em>Новый пользователь!</em> \n\n",
-    "$t(show_user_beauty, {{ \"user\": \"{user}\" }})"
   ],
   "error_bot_catch": [
     "❌ === BOT CATCH === \n",

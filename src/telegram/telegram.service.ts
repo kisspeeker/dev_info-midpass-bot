@@ -221,6 +221,12 @@ export class TelegramService {
         case AdminCommands.User:
           this.handleAdminShowUser(ctx);
           break;
+        case AdminCommands.Order:
+          this.handleAdminShowOrder(ctx);
+          break;
+        case AdminCommands.Audit:
+          this.handleAdminShowOrderAudit(ctx);
+          break;
         case AdminCommands.Send:
           this.handleAdminSend(ctx);
           break;
@@ -246,14 +252,14 @@ export class TelegramService {
   }
 
   private async handleAdminShowList(ctx: AppContext) {
-    this.botService.notify(
-      Object.entries(AdminCommandsDescription)
-        .map(
-          ([command, description]) =>
-            `<code>${TextCommands.Admin} ${command} </code> \n <em>${description}</em>`,
-        )
-        .join('\n\n'),
-    );
+    const message = Object.entries(AdminCommandsDescription)
+      .map(
+        ([command, description]) =>
+          `<code>${TextCommands.Admin} ${command} </code> \n <em>${description}</em>`,
+      )
+      .join('\n\n');
+
+    this.botService.notify(message);
   }
 
   private async handleAdminFindUser(userIdOrUsername: string) {
@@ -280,17 +286,67 @@ export class TelegramService {
       const user = await this.handleAdminFindUser(userIdOrUsername);
       const ordersBeauty = user.orders
         .map((order) => this.messageService.getMessageStatus(order))
-        .join('\n\n');
-      await this.appResponseService.success(LogsTypes.TgShowUser, '', {
-        user,
-        ordersBeauty,
-      });
+        .join(this.i18n.t('admin.separator'));
+      const message = this.i18n.t('admin.tg_show_user', { user, ordersBeauty });
+
+      this.botService.notify(message);
     } catch (e) {
       this.appResponseService.error(
         e,
         this.i18n.t('admin.error_show_user', { userIdOrUsername }),
         { userIdOrUsername },
         { userIdOrUsername },
+      );
+    }
+  }
+
+  private async handleAdminShowOrder(ctx: AppContext) {
+    const uid = ctx.message.text.split(' ')[2];
+
+    try {
+      const orderResponse = await this.ordersService.find(uid);
+
+      if (!orderResponse.success) {
+        return;
+      }
+      const order = orderResponse.data;
+      const message = this.messageService.getMessageStatus(
+        order,
+        undefined,
+        true,
+      );
+
+      this.botService.notify(message);
+    } catch (e) {
+      this.appResponseService.error(
+        e,
+        this.i18n.t('admin.error_show_order', { uid }),
+      );
+    }
+  }
+
+  private async handleAdminShowOrderAudit(ctx: AppContext) {
+    const uid = ctx.message.text.split(' ')[2];
+
+    try {
+      const orderAuditLogs = await this.ordersService.findAuditLogs(uid);
+      const pageSize = 10;
+
+      for (let i = 0; i < orderAuditLogs.length; i += pageSize) {
+        const group = orderAuditLogs.slice(i, i + pageSize);
+
+        const message = group
+          .map((orderAuditLog) =>
+            this.i18n.t('admin.order_audit_log_beauty', { orderAuditLog }),
+          )
+          .join(this.i18n.t('admin.separator'));
+
+        await this.botService.notify(message);
+      }
+    } catch (e) {
+      this.appResponseService.error(
+        e,
+        this.i18n.t('admin.error_show_order', { uid }),
       );
     }
   }

@@ -1,3 +1,4 @@
+import { getLocaleDateString } from 'src/utils';
 import {
   Column,
   CreateDateColumn,
@@ -52,4 +53,8 @@ export class OrderAuditLog {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  get updatedAtTimeString() {
+    return getLocaleDateString(this.updatedAt);
+  }
 }

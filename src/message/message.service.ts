@@ -133,6 +133,7 @@ export class MessageService {
   getMessageStatus(
     order: Order,
     type?: 'changed' | 'subscribed' | 'subscribedAlready',
+    showUser?: boolean,
   ) {
     const orderBeauty = this.i18n.t('user.message_status_order_beauty', {
       order: order.formatBeauty,
@@ -152,6 +153,10 @@ export class MessageService {
 
     if (type === 'changed') {
       message += donate;
+    }
+
+    if (showUser) {
+      message += `\n\n ${this.i18n.t('admin.order_userid', { order })}`;
     }
 
     return message;

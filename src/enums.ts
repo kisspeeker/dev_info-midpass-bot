@@ -40,11 +40,12 @@ export enum LogsTypes {
   OrderRequestMidpass = 'ORDER_REQUEST_MIDPASS',
 
   DbUserCreated = 'DB_USER_CREATED',
-  DbUserGet = 'DB_USER_GET',
+  DbUserFind = 'DB_USER_FIND',
   DbUserBlocked = 'DB_USER_BLOCKED',
   DbUserUnblocked = 'DB_USER_UNBLOCKED',
-  DbUsersFindAll = 'DB_USERS_GET_ALL',
+  DbUsersFindAll = 'DB_USERS_FIND_ALL',
   DbUsersFindAllFiltered = 'DB_USERS_GET_ALL_WITH_ORDERS',
+  DbOrderFind = 'DB_ORDER_FIND',
   DbOrderCreated = 'DB_ORDER_CREATED',
   DbOrderUpdated = 'DB_ORDER_UPDATED',
   DbOrderDeleted = 'DB_ORDER_DELETED',
@@ -59,6 +60,7 @@ export enum LogsTypes {
   TgStatusSent = 'TG_STATUS_SENT',
   TgUnsubscribeSent = 'TG_UNSUBSCRIBE_SENT',
   TgAdminMessageSent = 'TG_ADMIN_MESSAGE_SENT',
+  TgShowOrder = 'TG_SHOW_ORDER',
   TgShowUser = 'TG_SHOW_USER',
 
   TgUserStart = 'TG_USER_START',
@@ -80,6 +82,8 @@ export enum LogsTypes {
 
 export enum AdminCommands {
   User = 'user',
+  Order = 'order',
+  Audit = 'audit',
   Send = 'send',
   Block = 'block',
   Unblock = 'unblock',
@@ -88,6 +92,8 @@ export enum AdminCommands {
 
 export const AdminCommandsDescription = {
   [AdminCommands.User]: 'Показать пользователя [id, @username]',
+  [AdminCommands.Order]: 'Показать заявление [uid]',
+  [AdminCommands.Audit]: 'Показать логи заявления [uid]',
   [AdminCommands.Send]: 'Отправить сообщение пользователю [id, @username]',
   [AdminCommands.Block]: 'Заблокировать пользователя [id, @username]',
   [AdminCommands.Unblock]: 'Разблокировать пользователя [id, @username]',

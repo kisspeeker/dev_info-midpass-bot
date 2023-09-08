@@ -28,8 +28,12 @@ export class UsersService {
       });
 
       await this.usersRepository.save(newUser);
-      return await this.appResponseService.success(
+      await this.appResponseService.success(
         LogsTypes.DbUserCreated,
+        newUser.id,
+      );
+      return await this.appResponseService.success(
+        LogsTypes.TgShowUser,
         newUser.id,
         newUser,
         { user: newUser },
@@ -112,7 +116,7 @@ export class UsersService {
       }
 
       return this.appResponseService.success(
-        LogsTypes.DbUserGet,
+        LogsTypes.DbUserFind,
         user.id,
         user,
       );
