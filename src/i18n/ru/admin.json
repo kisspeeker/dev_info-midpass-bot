@@ -1,37 +1,83 @@
 {
+  "fallback": [
+    "⚠️ {type} \n",
+    "<em>{error}</em> \n",
+    "<b>{message}</b> \n",
+    "<em>{data}</em> \n"
+  ],
+  "tg_show_user": [
+    "ℹ️ <b>id:</b>\n",
+    " └ <code>{user.id}</code>\n\n",
+    "ℹ️ <b>userName:</b>\n",
+    " └ {user.userName}\n\n",
+    "ℹ️ <b>firstName:</b>\n",
+    " └ {user.firstName}\n\n",
+    "ℹ️ <b>lastName:</b>\n",
+    " └ {user.lastName}\n\n",
+    "{ordersBeauty}"
+  ],
   "user_spaming": [
-    "⚠️ Пользователь <code>{id}</code> спамит"
+    "⚠️ <em>Пользователь <code>{id}</code> спамит</em>"
+  ],
+  "tg_bot_start": [
+    "✅ <em>Bot started!</em> \n\n",
+    "ℹ️ Пользователи с заявлениями:\n",
+    " └ <b>{usersCount}</b>\n\n",
+    "ℹ️ Активные заявления:\n",
+    " └ <b>{ordersCount}</b>\n\n",
+    "ℹ️ Режим isUnderConstruction:\n",
+    " └ <b>{isUnderConstruction}</b>\n"
   ],
   "tg_admin_message_sent": [
-    "✅ Успешно написал пользователю <code>{user.id}</code>"
+    "✅ <em>Успешно написал пользователю <code>{user.id}</code></em>"
   ],
   "db_user_blocked": [
-    "🚫 Пользователь <code>{id}</code> заблокирован"
+    "🚫 <em>Пользователь <code>{user.id}</code> заблокирован</em>"
   ],
   "db_user_unblocked": [
-    "✅ Пользователь <code>{id}</code> разблокирован"
+    "✅ <em>Пользователь <code>{user.id}</code> разблокирован</em>"
   ],
   "user_message": [
-    "ℹ️ Сообщение от пользователя <code>{user.id}</code>:\n\n",
-    "<em>{message}</em>"
+    "ℹ️ <em>Сообщение от пользователя <code>{user.id}</code>:</em>\n\n",
+    "{message}"
   ],
   "db_user_created": [
-    "🆕 Новый пользователь! \n\n",
-    "<b>id:</b> <code>{user.id}</code>\n",
-    "<b>userName:</b> {user.userName}\n",
-    "<b>firstName:</b> {user.firstName}\n",
-    "<b>lastName:</b> {user.lastName}"
+    "🆕 <em>Новый пользователь!</em> \n\n",
+    "$t(show_user_beauty, {{ \"user\": \"{user}\" }})"
   ],
-  "error_user_not_found": [
-    "❌ Пользователь не найден <code>{user.id}</code>"
+  "error_bot_catch": [
+    "❌ === BOT CATCH === \n",
+    "{error} \n",
+    "<b>{message}</b>"
+  ],
+  "error_midpass_Timeout": [
+    "❌ {type} \n",
+    "<b>{message}</b>"
+  ],
+  "error_autoupdate_root": [
+    "❌ {type} \n",
+    "<b>{message}</b> \n"
   ],
   "error_block_by_user": [
-    "❌ Bot was blocked by the user <code>{user.id}</code>. Он больше не выпадает в выдаче, его заявления удалены"
-  ],
-  "error_command_not_found": [
-    "❌ Такой команды не существует"
+    "❌ {type} \n",
+    "<em>Bot was blocked by the user <code>{user.id}</code>. Он больше не выпадает в выдаче, его заявления удалены </em>\n",
+    "<b>{message}</b> \n"
   ],
   "error_user_send_message": [
-    "❌ Не удалось отправить сообщение пользователю <code>{user.id}</code>"
+    "❌ <em>Не удалось отправить сообщение пользователю <code>{userIdOrUsername}</code></em>"
+  ],
+  "error_user_not_found": [
+    "❌ {type} \n",
+    "<em>Пользователь не найден <code>{user.id}</code></em> \n",
+    "<b>{message}</b> \n"
+  ],
+  "error_user_not_allowed_to_update_order": [
+    "❌ <em>Пользователь <code>{user.id}</code> пытался подписаться на чужое заявление {order.uid} пользователя {order.userId}</em> \n"
+  ],
+  "error_max_orders_per_user": [
+    "❌ <em>Пользователь <code>{user.id}</code> пытался превысить максимальное количество заявлений</em> \n"
+  ],
+  "error_command_not_found": [
+    "❌ <em>Такой команды не существует</em>"
   ]
 }

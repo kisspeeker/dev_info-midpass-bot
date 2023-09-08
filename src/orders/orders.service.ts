@@ -274,36 +274,36 @@ export class OrdersService {
     }
   }
 
-  async getAll() {
+  async findAll() {
     try {
       const orders = await this.ordersRepository.find();
       return this.appResponseService.success(
-        LogsTypes.DbOrdersGetAll,
+        LogsTypes.DbOrdersFindAll,
         String(orders.length),
         orders,
       );
     } catch (e) {
       return await this.appResponseService.error<Order[]>(
         LogsTypes.Error,
-        'error in orders.service.getAll',
+        'error in orders.service.findAll',
       );
     }
   }
 
-  async getAllFiltered() {
+  async findAllFiltered() {
     try {
       const orders = await this.ordersRepository.findBy({
         isDeleted: false,
       });
       return await this.appResponseService.success(
-        LogsTypes.DbOrdersGetAllFiltered,
+        LogsTypes.DbOrdersFindAllFiltered,
         String(orders.length),
         orders,
       );
     } catch (e) {
       return await this.appResponseService.error<Order[]>(
         LogsTypes.Error,
-        'error in orders.service.getAllFiltered',
+        'error in orders.service.findAllFiltered',
       );
     }
   }

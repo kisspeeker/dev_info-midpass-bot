@@ -137,7 +137,7 @@
     "<b>🕔 Актуален на:</b>\n",
     " └ {order.updatedAtTimeString} мск\n\n",
     "<b>#️⃣ Номер заявления:</b>\n",
-    " └ {order.uid}\n\n",
+    " └ <code>{order.uid}</code>\n\n",
     "<b>🟡 Процент:</b>\n",
     " └ {order.statusPercent}\n\n",
     "<b>🟡 Статус:</b>\n",
@@ -153,6 +153,8 @@
     "<em>ℹ️ Если тебе понравился @info_midpass_bot и ты хочешь поддержать автора донатом, кликай по ссылочкам:</em> \n\n",
     "<b>Тинькофф</b> (RU карты) \n",
     "https://www.tinkoff.ru/rm/shiryakov.aleksandr1/c7D9X11194/ \n\n",
+    "<b>Patreon</b> (Любые карты, подписка) \n",
+    "https://patreon.com/kisspeeker \n\n",
     "<b>DonationAlerts</b> (Любые карты) \n",
     "https://www.donationalerts.com/r/kisspeeker"
   ],

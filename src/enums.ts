@@ -35,6 +35,7 @@ export enum LogsTypes {
   ErrorOrderNotFound = 'ERROR_ORDER_NOT_FOUND',
   ErrorOrdersNotFound = 'ERROR_ORDERS_NOT_FOUND',
   ErrorMaxOrdersPerUser = 'ERROR_MAX_ORDERS_PER_USER',
+  ErrorShowUser = 'ERROR_SHOW_USER',
 
   OrderRequestMidpass = 'ORDER_REQUEST_MIDPASS',
 
@@ -42,23 +43,24 @@ export enum LogsTypes {
   DbUserGet = 'DB_USER_GET',
   DbUserBlocked = 'DB_USER_BLOCKED',
   DbUserUnblocked = 'DB_USER_UNBLOCKED',
-  DbUsersGetAll = 'DB_USERS_GET_ALL',
-  DbUsersGetAllWithOrders = 'DB_USERS_GET_ALL_WITH_ORDERS',
+  DbUsersFindAll = 'DB_USERS_GET_ALL',
+  DbUsersFindAllFiltered = 'DB_USERS_GET_ALL_WITH_ORDERS',
   DbOrderCreated = 'DB_ORDER_CREATED',
   DbOrderUpdated = 'DB_ORDER_UPDATED',
   DbOrderDeleted = 'DB_ORDER_DELETED',
   DbOrdersDeletedAll = 'DB_ORDERS_DELETED_ALL',
-  DbOrdersGetAll = 'DB_ORDERS_GET_ALL',
-  DbOrdersGetAllFiltered = 'DB_ORDERS_GET_ALL_FILTERED',
+  DbOrdersFindAll = 'DB_ORDERS_GET_ALL',
+  DbOrdersFindAllFiltered = 'DB_ORDERS_GET_ALL_FILTERED',
   DbOrderAuditCreated = 'DB_ORDER_AUDIT_CREATED',
 
+  TgBotStart = 'TG_BOT_START',
   TgMessageSent = 'TG_MESSAGE_SENT',
   TgOrdersSent = 'TG_ORDERS_SENT',
   TgStatusSent = 'TG_STATUS_SENT',
   TgUnsubscribeSent = 'TG_UNSUBSCRIBE_SENT',
   TgAdminMessageSent = 'TG_ADMIN_MESSAGE_SENT',
+  TgShowUser = 'TG_SHOW_USER',
 
-  TgBotStart = 'TG_BOT_START',
   TgUserStart = 'TG_USER_START',
   TgUserSupport = 'TG_USER_SUPPORT',
   TgUserUnsubscribed = 'TG_USER_UNSUBSCRIBED',
@@ -77,6 +79,7 @@ export enum LogsTypes {
 }
 
 export enum AdminCommands {
+  User = 'user',
   Send = 'send',
   Block = 'block',
   Unblock = 'unblock',
@@ -84,6 +87,7 @@ export enum AdminCommands {
 }
 
 export const AdminCommandsDescription = {
+  [AdminCommands.User]: 'Показать пользователя [id, @username]',
   [AdminCommands.Send]: 'Отправить сообщение пользователю [id, @username]',
   [AdminCommands.Block]: 'Заблокировать пользователя [id, @username]',
   [AdminCommands.Unblock]: 'Разблокировать пользователя [id, @username]',

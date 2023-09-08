@@ -16,4 +16,9 @@ export class CustomI18nService {
     }
     return String(res);
   }
+
+  tExist(messageKey: string, ...args) {
+    const message = this.t(messageKey, ...args);
+    return message !== messageKey ? message : this.t('admin.fallback', ...args);
+  }
 }

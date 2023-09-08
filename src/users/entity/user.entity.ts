@@ -44,4 +44,8 @@ export class User {
   get isAdmin() {
     return this.id === this.adminId;
   }
+
+  get ordersFormatBeauty() {
+    return this.orders.map((order) => order.formatBeauty).join('\n\n');
+  }
 }

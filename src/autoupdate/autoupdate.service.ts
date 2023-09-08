@@ -54,7 +54,7 @@ export class AutoupdateService {
     this.appResponseService.success(LogsTypes.AutoupdateStart, `${startDate}`);
 
     try {
-      const ordersResponse = await this.ordersService.getAllFiltered();
+      const ordersResponse = await this.ordersService.findAllFiltered();
       if (!ordersResponse.success) {
         throw ordersResponse;
       }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Context, Telegraf } from 'telegraf';
+import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 
 import {
@@ -47,17 +47,22 @@ export class TelegramService {
 
   private async initBot() {
     if (this.isUnderConstruction) {
-      this.appResponseService.success(
-        LogsTypes.TgBotStart,
-        'isUnderConstruction',
-      );
+      this.appResponseService.success(LogsTypes.TgBotStart, null, null, {
+        usersCount: 0,
+        ordersCount: 0,
+        isUnderConstruction: true,
+      });
     } else {
-      const usersCountResponse = await this.usersService.findAllWithOrders();
-      if (usersCountResponse.success) {
-        this.appResponseService.success(
-          LogsTypes.TgBotStart,
-          `UsersWithOrders: ${(usersCountResponse.data || []).length}`,
-        );
+      const [usersCountResponse, ordersCountResponse] = await Promise.all([
+        await this.usersService.findAllFiltered(),
+        await this.ordersService.findAllFiltered(),
+      ]);
+      if (usersCountResponse.success && ordersCountResponse.success) {
+        this.appResponseService.success(LogsTypes.TgBotStart, null, null, {
+          usersCount: usersCountResponse.data.length,
+          ordersCount: ordersCountResponse.data.length,
+          isUnderConstruction: false,
+        });
       }
     }
 
@@ -186,6 +191,15 @@ export class TelegramService {
             this.handleUserSubscribe(ctx, user);
             return;
           }
+          await this.appResponseService.error(
+            LogsTypes.ErrorOrderValidate,
+            user.id,
+          );
+          await this.messageService.sendMessage(
+            user,
+            this.i18n.t('user_errors.message_order_validate'),
+          );
+          return;
       }
     } catch (e) {
       this.appResponseService.error(LogsTypes.Error, e);
@@ -204,8 +218,14 @@ export class TelegramService {
 
     try {
       switch (textCommand) {
+        case AdminCommands.User:
+          this.handleAdminShowUser(ctx);
+          break;
         case AdminCommands.Send:
           this.handleAdminSend(ctx);
+          break;
+        case AdminCommands.Block:
+          this.handleAdminBlock(ctx);
           break;
         case AdminCommands.Block:
           this.handleAdminBlock(ctx);
@@ -236,6 +256,45 @@ export class TelegramService {
     );
   }
 
+  private async handleAdminFindUser(userIdOrUsername: string) {
+    try {
+      const userResponse = await this.usersService.find({
+        id: userIdOrUsername,
+        username: userIdOrUsername,
+      });
+
+      if (!userResponse.success) {
+        return;
+      }
+
+      return userResponse.data;
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  private async handleAdminShowUser(ctx: AppContext) {
+    const userIdOrUsername = ctx.message.text.split(' ')[2];
+
+    try {
+      const user = await this.handleAdminFindUser(userIdOrUsername);
+      const ordersBeauty = user.orders
+        .map((order) => this.messageService.getMessageStatus(order))
+        .join('\n\n');
+      await this.appResponseService.success(LogsTypes.TgShowUser, '', {
+        user,
+        ordersBeauty,
+      });
+    } catch (e) {
+      this.appResponseService.error(
+        e,
+        this.i18n.t('admin.error_show_user', { userIdOrUsername }),
+        { userIdOrUsername },
+        { userIdOrUsername },
+      );
+    }
+  }
+
   private async handleAdminBlock(ctx: AppContext) {
     const userId = ctx.message.text.split(' ')[2];
     await this.usersService.block({ id: userId });
@@ -251,16 +310,7 @@ export class TelegramService {
     const messageToUser = ctx.message.text.split(' ').slice(3).join(' ');
 
     try {
-      const userToSendResponse = await this.usersService.find({
-        id: userIdOrUsername,
-        username: userIdOrUsername,
-      });
-
-      if (!userToSendResponse.success) {
-        return;
-      }
-
-      const userToSend = userToSendResponse.data;
+      const userToSend = await this.handleAdminFindUser(userIdOrUsername);
 
       const messageResponse = await this.messageService.sendMessage(
         userToSend,
@@ -454,17 +504,6 @@ export class TelegramService {
       this.messageService.sendMessageStatus(updatedUser, order, 'subscribed');
       return;
     }
-
-    this.appResponseService.error(
-      LogsTypes.ErrorOrderValidate,
-      updatedUser.id,
-      null,
-      { order },
-    );
-    this.messageService.sendMessage(
-      updatedUser,
-      this.i18n.t('user_errors.message_order_validate'),
-    );
   }
 
   private async handleUserOrdersList(ctx: AppContext, user: User) {

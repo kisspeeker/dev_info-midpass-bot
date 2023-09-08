@@ -45,6 +45,7 @@ const notifiedLogs = [
 
   LogsTypes.TgBotStart,
   LogsTypes.TgUserUnsubscribed,
+  LogsTypes.TgShowUser,
 
   LogsTypes.AutoupdateStart,
   LogsTypes.AutoupdateEnd,
@@ -65,12 +66,9 @@ export class AppResponseService {
     meta?: unknown,
   ) {
     if (notifiedLogs.includes(type)) {
-      console.warn('eventHandler', Object.assign({}, message, data, meta));
+      const assignedData = Object.assign({}, { message }, data, meta, { type });
       await this.botService.notify(
-        this.i18n.t(
-          `admin.${type.toLowerCase()}`,
-          Object.assign({}, message, data, meta),
-        ),
+        this.i18n.tExist(`admin.${type.toLowerCase()}`, assignedData),
       );
     }
   }

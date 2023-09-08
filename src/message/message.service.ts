@@ -130,6 +130,33 @@ export class MessageService {
     }
   }
 
+  getMessageStatus(
+    order: Order,
+    type?: 'changed' | 'subscribed' | 'subscribedAlready',
+  ) {
+    const orderBeauty = this.i18n.t('user.message_status_order_beauty', {
+      order: order.formatBeauty,
+    });
+    const donate = this.i18n.t('user.message_donate');
+    let message = this.i18n.t('user.message_order_empty');
+
+    if (type === 'changed') {
+      message = this.i18n.t('user.message_order_changed');
+    } else if (type === 'subscribed') {
+      message = this.i18n.t('user.message_order_subscribed');
+    } else if (type === 'subscribedAlready') {
+      message = this.i18n.t('user.message_order_subscribed_already');
+    }
+
+    message += orderBeauty;
+
+    if (type === 'changed') {
+      message += donate;
+    }
+
+    return message;
+  }
+
   async sendMessageStatus(
     user: User,
     order: Order,
@@ -137,25 +164,7 @@ export class MessageService {
   ) {
     try {
       const image = await OrdersService.getStatusImage(order);
-      const orderBeauty = this.i18n.t('user.message_status_order_beauty', {
-        order: order.formatBeauty,
-      });
-      const donate = this.i18n.t('user.message_donate');
-      let message = this.i18n.t('user.message_order_empty');
-
-      if (type === 'changed') {
-        message = this.i18n.t('user.message_order_changed');
-      } else if (type === 'subscribed') {
-        message = this.i18n.t('user.message_order_subscribed');
-      } else if (type === 'subscribedAlready') {
-        message = this.i18n.t('user.message_order_subscribed_already');
-      }
-
-      message += orderBeauty;
-
-      if (type === 'changed') {
-        message += donate;
-      }
+      const message = this.getMessageStatus(order, type);
 
       await this.bot.telegram.sendPhoto(
         user.id,

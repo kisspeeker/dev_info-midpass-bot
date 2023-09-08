@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
@@ -50,7 +50,7 @@ export class UsersService {
     try {
       const users = await this.usersRepository.find({ relations: ['orders'] });
       return await this.appResponseService.success(
-        LogsTypes.DbUsersGetAll,
+        LogsTypes.DbUsersFindAll,
         String(users.length),
         users,
       );
@@ -62,18 +62,18 @@ export class UsersService {
     }
   }
 
-  async findAllWithOrders() {
+  async findAllFiltered() {
     try {
-      const queryBuilder: SelectQueryBuilder<User> =
-        this.usersRepository.createQueryBuilder('user');
-
-      queryBuilder.innerJoinAndSelect('user.orders', 'order');
-      queryBuilder.groupBy('user.id');
-      queryBuilder.having('COUNT(order.uid) > 0');
-      const users = await queryBuilder.getMany();
+      const usersResponse = await this.findAll();
+      if (usersResponse.success === false) {
+        return;
+      }
+      const users = usersResponse.data.filter(
+        (user) => user.filteredOrders.length,
+      );
 
       return await this.appResponseService.success(
-        LogsTypes.DbUsersGetAllWithOrders,
+        LogsTypes.DbUsersFindAllFiltered,
         String(users.length),
         users,
       );
