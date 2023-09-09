@@ -49,6 +49,12 @@
   "tg_admin_message_sent": [
     "✅ <em>Успешно написал пользователю <code>{user.id}</code></em>"
   ],
+  "tg_user_subscribed": [
+    "🆕 <em>Пользователь <code>{order.userId}</code> подписался на <code>{order.uid}</code></em>"
+  ],
+  "tg_user_unsubscribed": [
+    "🗑 <em>Пользователь <code>{order.userId}</code> отписался от <code>{order.uid}</code></em>"
+  ],
   "db_user_blocked": [
     "🚫 <em>Пользователь <code>{user.id}</code> заблокирован</em>"
   ],

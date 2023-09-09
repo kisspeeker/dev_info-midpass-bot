@@ -41,6 +41,9 @@
   "button_unsubscribe_order": [
     "Отписаться от {order.shortUid} ❌"
   ],
+  "answer_cb_success": [
+    "✅ Успешно"
+  ],
   "message_under_construction": [
     "<em>ℹ️ В данный момент я нахожусь на обслуживании и улучшении пользовательского опыта. Попробуй написать мне позднее</em>"
   ],

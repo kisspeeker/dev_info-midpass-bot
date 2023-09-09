@@ -44,6 +44,7 @@ const notifiedLogs = [
   LogsTypes.TgAdminMessageSent,
 
   LogsTypes.TgBotStart,
+  // LogsTypes.TgUserSubscribed,
   LogsTypes.TgUserUnsubscribed,
   LogsTypes.TgShowUser,
 

@@ -174,7 +174,7 @@ export class OrdersService {
         throw {
           type: LogsTypes.ErrorUserNotAllowedToUpdateOrder,
           message: createOrderDto.uid,
-          meta: { user },
+          meta: { user, order: existingOrder },
         };
       }
 
@@ -342,7 +342,7 @@ export class OrdersService {
             type: LogsTypes.ErrorUserNotAllowedToUpdateOrder,
             message: uid,
             data: null,
-            user,
+            meta: { user, order: existingOrder },
           };
         }
 

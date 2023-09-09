@@ -7,6 +7,8 @@ import { OrdersModule } from 'src/orders/orders.module';
 import { MessageModule } from 'src/message/message.module';
 import { BotModule } from 'src/bot/bot.module';
 import { AutoupdateModule } from 'src/autoupdate/autoupdate.module';
+import { TelegramAdminService } from 'src/telegram/telegram-admin.service';
+import { TelegramUserService } from 'src/telegram/telegram-user.service';
 
 @Module({
   imports: [
@@ -17,6 +19,6 @@ import { AutoupdateModule } from 'src/autoupdate/autoupdate.module';
     AutoupdateModule,
     HttpModule,
   ],
-  providers: [TelegramService],
+  providers: [TelegramService, TelegramAdminService, TelegramUserService],
 })
 export class TelegramModule {}

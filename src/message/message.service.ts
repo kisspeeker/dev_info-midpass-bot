@@ -139,14 +139,14 @@ export class MessageService {
       order: order.formatBeauty,
     });
     const donate = this.i18n.t('user.message_donate');
-    let message = this.i18n.t('user.message_order_empty');
+    let message = order.isNew ? this.i18n.t('user.message_order_empty') : '';
 
     if (type === 'changed') {
-      message = this.i18n.t('user.message_order_changed');
+      message += this.i18n.t('user.message_order_changed');
     } else if (type === 'subscribed') {
-      message = this.i18n.t('user.message_order_subscribed');
+      message += this.i18n.t('user.message_order_subscribed');
     } else if (type === 'subscribedAlready') {
-      message = this.i18n.t('user.message_order_subscribed_already');
+      message += this.i18n.t('user.message_order_subscribed_already');
     }
 
     message += orderBeauty;

@@ -40,7 +40,7 @@ export class BotService {
       window: TG_RATE_LIMIT,
       limit: 1,
       onLimitExceeded: (ctx) => {
-        ctx.reply(this.i18n.t('user_errors.message_rate_limit'));
+        // ctx.reply(this.i18n.t('user_errors.message_rate_limit'));
         this.notify(this.i18n.t('admin.user_spaming', { id: ctx.from.id }));
       },
     });
@@ -54,6 +54,15 @@ export class BotService {
     );
   }
 
+  get botCommands() {
+    return Object.values(BotCommands).map((command) => {
+      return {
+        command,
+        description: this.i18n.t(`user.command_${command}`),
+      };
+    });
+  }
+
   async notify(message: string) {
     try {
       await this.bot.telegram.sendMessage(this.adminId, message, {
@@ -63,15 +72,6 @@ export class BotService {
       console.error(e);
       throw e;
     }
-  }
-
-  get botCommands() {
-    return Object.values(BotCommands).map((command) => {
-      return {
-        command,
-        description: this.i18n.t(`user.command_${command}`),
-      };
-    });
   }
 
   async startBot() {

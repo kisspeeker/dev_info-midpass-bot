@@ -61,6 +61,10 @@ export class Order {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  get isNew() {
+    return this.statusPercent === null;
+  }
+
   get updatedAtTimeString() {
     return getLocaleDateString(this.updatedAt);
   }
