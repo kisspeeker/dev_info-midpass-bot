@@ -50,45 +50,6 @@ export class UsersService {
     }
   }
 
-  async findAll() {
-    try {
-      const users = await this.usersRepository.find({ relations: ['orders'] });
-      return await this.appResponseService.success(
-        LogsTypes.DbUsersFindAll,
-        String(users.length),
-        users,
-      );
-    } catch (e) {
-      return await this.appResponseService.error<User[]>(
-        LogsTypes.ErrorUsersFindAll,
-        e,
-      );
-    }
-  }
-
-  async findAllFiltered() {
-    try {
-      const usersResponse = await this.findAll();
-      if (usersResponse.success === false) {
-        return;
-      }
-      const users = usersResponse.data.filter(
-        (user) => user.filteredOrders.length,
-      );
-
-      return await this.appResponseService.success(
-        LogsTypes.DbUsersFindAllFiltered,
-        String(users.length),
-        users,
-      );
-    } catch (e) {
-      return await this.appResponseService.error<User[]>(
-        LogsTypes.ErrorUsersFindWithOrders,
-        e,
-      );
-    }
-  }
-
   async find(createUserDto: CreateUserDto, createIfNotFound = false) {
     try {
       let user = await this.usersRepository.findOne({
@@ -126,6 +87,46 @@ export class UsersService {
         'error in users.service.find',
         null,
         { user: createUserDto },
+      );
+    }
+  }
+
+  async findAll() {
+    try {
+      const users = await this.usersRepository.find({ relations: ['orders'] });
+      return await this.appResponseService.success(
+        LogsTypes.DbUsersFindAll,
+        String(users.length),
+        users,
+      );
+    } catch (e) {
+      return await this.appResponseService.error<User[]>(
+        LogsTypes.ErrorUsersFindAll,
+        e,
+      );
+    }
+  }
+
+  async findAllFiltered() {
+    try {
+      const usersResponse = await this.findAll();
+      if (usersResponse.success === false) {
+        return;
+      }
+
+      const users = usersResponse.data.filter((user) => {
+        return !!user.filteredOrders.length;
+      });
+
+      return await this.appResponseService.success(
+        LogsTypes.DbUsersFindAllFiltered,
+        String(users.length),
+        users,
+      );
+    } catch (e) {
+      return await this.appResponseService.error<User[]>(
+        LogsTypes.ErrorUsersFindWithOrders,
+        e,
       );
     }
   }

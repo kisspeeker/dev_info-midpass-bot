@@ -12,7 +12,6 @@ import { Telegraf } from 'telegraf';
 @Injectable()
 export class MessageService {
   private bot: Telegraf;
-  private adminId: string = process.env.TG_ADMIN_ID;
 
   constructor(
     private readonly botService: BotService,

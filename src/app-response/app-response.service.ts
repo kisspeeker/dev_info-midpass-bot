@@ -11,7 +11,7 @@ export type AppResponseSuccess<T> = {
 
 export type AppResponseError<T> = {
   success: false;
-  message: string;
+  message: string | unknown;
   data?: T;
   error: LogsTypes;
 };
@@ -76,11 +76,11 @@ export class AppResponseService {
 
   public async success<T>(
     type: LogsTypes,
-    message: string,
+    message: string | unknown,
     data: T = null,
     meta?: unknown,
   ): Promise<AppResponseSuccess<T>> {
-    this.logger.log(type, message, meta);
+    this.logger.log(type, String(message), meta);
     this.eventHandler(type, message, data, meta);
 
     return {
@@ -91,11 +91,11 @@ export class AppResponseService {
 
   public async error<T>(
     type: LogsTypes,
-    message: string,
+    message: string | unknown,
     data?: T,
     meta?: unknown,
   ): Promise<AppResponseError<T>> {
-    this.logger.error(type, message, meta);
+    this.logger.error(type, String(message), meta);
     this.eventHandler(type, message, data, meta);
 
     return {

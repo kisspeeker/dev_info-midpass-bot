@@ -11,7 +11,7 @@ import { Order } from 'src/orders/entity/order.entity';
 
 @Entity()
 export class User {
-  private adminId: string = process.env.TG_ADMIN_ID;
+  private readonly adminId: string = process.env.TG_ADMIN_ID;
 
   @PrimaryColumn()
   id: string;
