@@ -126,7 +126,7 @@ export class AutoupdateService {
       counter.routes[midpassResult.proxy] =
         (counter.routes[midpassResult.proxy] || 0) + 1;
 
-      const hasChanges = OrdersService.hasChangesWith(
+      const hasChanges = OrdersService.isDifferentOrders(
         order,
         midpassResult.order,
       );

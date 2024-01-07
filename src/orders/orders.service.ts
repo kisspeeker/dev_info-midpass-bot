@@ -85,7 +85,7 @@ export class OrdersService {
     }
   }
 
-  static hasChangesWith(currentOrder: Order, newOrder: Order) {
+  static isDifferentOrders(currentOrder: Order, newOrder: Order) {
     return (
       currentOrder.statusPercent !== newOrder.statusPercent ||
       currentOrder.statusName !== newOrder.statusName ||

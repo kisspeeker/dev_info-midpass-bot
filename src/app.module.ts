@@ -27,7 +27,7 @@ import { AppResponseModule } from 'src/app-response/app-response.module';
       envFilePath: ['.env.local', '.env'],
     }),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'), // Путь к каталогу public
+      rootPath: join(__dirname, '..', 'public'),
     }),
     I18nModule.forRoot({
       fallbackLanguage: 'ru',

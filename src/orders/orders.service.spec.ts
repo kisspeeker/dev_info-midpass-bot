@@ -157,27 +157,27 @@ describe('OrdersService', () => {
     }
   });
 
-  it('hasChangesWith -> should find changes correct', () => {
+  it('isDifferentOrders -> should find changes correct', () => {
     for (const order of JSON.parse(JSON.stringify(mockOrders))) {
       order.statusPercent = 0;
       order.statusName = mockStatuses[0];
       const newOrder = JSON.parse(JSON.stringify(order));
 
-      expect(OrdersService.hasChangesWith(order, newOrder)).toBeFalsy();
+      expect(OrdersService.isDifferentOrders(order, newOrder)).toBeFalsy();
       newOrder.isDeleted = true;
-      expect(OrdersService.hasChangesWith(order, newOrder)).toBeFalsy();
+      expect(OrdersService.isDifferentOrders(order, newOrder)).toBeFalsy();
       newOrder.isDeleted = order.isDeleted;
       newOrder.userId = '123';
-      expect(OrdersService.hasChangesWith(order, newOrder)).toBeFalsy();
+      expect(OrdersService.isDifferentOrders(order, newOrder)).toBeFalsy();
 
       newOrder.statusPercent = 100;
-      expect(OrdersService.hasChangesWith(order, newOrder)).toBeTruthy();
+      expect(OrdersService.isDifferentOrders(order, newOrder)).toBeTruthy();
       newOrder.statusPercent = order.statusPercent;
       newOrder.statusName = mockStatuses[1];
-      expect(OrdersService.hasChangesWith(order, newOrder)).toBeTruthy();
+      expect(OrdersService.isDifferentOrders(order, newOrder)).toBeTruthy();
       newOrder.statusName = order.statusName;
       newOrder.statusInternalName = 'statusInternalName';
-      expect(OrdersService.hasChangesWith(order, newOrder)).toBeTruthy();
+      expect(OrdersService.isDifferentOrders(order, newOrder)).toBeTruthy();
     }
   });
 
