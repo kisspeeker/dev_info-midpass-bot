@@ -39,7 +39,11 @@ export function calculateDaysDifference(
 
 export function isValidDate(checkingDate: string | Date) {
   const date = new Date(checkingDate);
-  return !isNaN(+date) && date instanceof Date;
+  return (
+    !isNaN(+date) &&
+    date instanceof Date &&
+    Math.abs(new Date().getFullYear() - date.getFullYear()) < 5
+  );
 }
 
 export async function sleep(delay: number = 100) {

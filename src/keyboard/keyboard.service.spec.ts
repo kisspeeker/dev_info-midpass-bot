@@ -46,7 +46,7 @@ describe('KeyboardService', () => {
     });
   });
 
-  it('useKeyboardInlineOrders correct number of buttons', () => {
+  it('useKeyboardInlineOrders correct number of inline orders buttons', () => {
     mockUsers.forEach((user) => {
       const buttonsCount = (
         service.useKeyboardInlineOrders(user)
@@ -61,7 +61,7 @@ describe('KeyboardService', () => {
     });
   });
 
-  it('useKeyboardInlineUnsubscribe correct number of buttons', () => {
+  it('useKeyboardInlineUnsubscribe correct number of inline buttons', () => {
     mockUsers.forEach((user) => {
       const buttonsCount = (
         service.useKeyboardInlineUnsubscribe(user)

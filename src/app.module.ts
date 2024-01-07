@@ -42,7 +42,7 @@ import { AppResponseModule } from 'src/app-response/app-response.module';
     }),
     TypeOrmModule.forRoot({
       type: 'sqlite',
-      database: 'info-midpass-bot.db',
+      database: 'midpass.db',
       entities: [User, Order, OrderAuditLog],
       synchronize: true,
     }),

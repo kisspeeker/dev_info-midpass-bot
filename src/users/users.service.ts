@@ -7,6 +7,7 @@ import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/users/entity/user.entity';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { AppResponseService } from 'src/app-response/app-response.service';
+import { OrdersService } from 'src/orders/orders.service';
 
 @Injectable()
 export class UsersService {
@@ -115,7 +116,12 @@ export class UsersService {
       }
 
       const users = usersResponse.data.filter((user) => {
-        return !!user.filteredOrders.length;
+        return (
+          !!user.filteredOrders.length &&
+          user.filteredOrders.every(
+            (order) => !OrdersService.isCompleteOrder(order),
+          )
+        );
       });
 
       return await this.appResponseService.success(

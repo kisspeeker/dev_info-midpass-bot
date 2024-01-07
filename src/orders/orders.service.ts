@@ -10,6 +10,7 @@ import { resolve } from 'path';
 
 import {
   API_ROUTE_MIDPASS_PROXIES,
+  ORDER_UID_LENGTH,
   ORDER_UID_SHORT_LENGTH,
   FALSY_PASSPORT_STATUSES,
   MAX_ORDERS_PER_USER,
@@ -46,11 +47,22 @@ export class OrdersService {
   ) {}
 
   static isValidUid(uid = '') {
-    return uid && String(uid).length === 25 && String(uid).startsWith('2000');
+    const str = String(uid);
+
+    return (
+      uid &&
+      str.length === ORDER_UID_LENGTH &&
+      str.startsWith('2000') &&
+      OrdersService.parseReceptionDateFromUid(str) !== '-'
+    );
   }
 
   static isValidUidShort(shortUid = '') {
     return shortUid && String(shortUid).length === ORDER_UID_SHORT_LENGTH + 1;
+  }
+
+  static parseShortUidFromUid(uid = '') {
+    return `*${uid.slice(-ORDER_UID_SHORT_LENGTH)}`;
   }
 
   static isCompleteOrder(order: Order) {
@@ -68,7 +80,8 @@ export class OrdersService {
       const result = `${year}-${month}-${day}`;
       return isValidDate(result) ? result : '-';
     } catch (e) {
-      console.error(e);
+      // console.error(e);
+      return '-';
     }
   }
 
@@ -180,7 +193,7 @@ export class OrdersService {
 
       const newOrder = this.ordersRepository.create({
         uid: String(createOrderDto.uid),
-        shortUid: `*${createOrderDto.uid.slice(-ORDER_UID_SHORT_LENGTH)}`,
+        shortUid: OrdersService.parseShortUidFromUid(createOrderDto.uid),
         receptionDate: OrdersService.parseReceptionDateFromUid(
           createOrderDto.uid,
         ),

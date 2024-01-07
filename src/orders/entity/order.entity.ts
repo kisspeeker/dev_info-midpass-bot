@@ -10,7 +10,7 @@ import {
 import { User } from 'src/users/entity/user.entity';
 import { calculateDaysDifference, getLocaleDateString } from 'src/utils';
 
-@Entity()
+@Entity({ name: 'midpass_order' })
 export class Order {
   @PrimaryColumn()
   uid: string;

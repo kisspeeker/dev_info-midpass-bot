@@ -7,7 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity()
+@Entity({ name: 'midpass_order_audit_log' })
 export class OrderAuditLog {
   @PrimaryGeneratedColumn()
   id: string;

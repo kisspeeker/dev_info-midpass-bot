@@ -9,20 +9,20 @@ import {
 
 import { Order } from 'src/orders/entity/order.entity';
 
-@Entity()
+@Entity({ name: 'telegram_user' })
 export class User {
   private readonly adminId: string = process.env.TG_ADMIN_ID;
 
   @PrimaryColumn()
   id: string;
 
-  @Column()
+  @Column({ nullable: true })
   firstName: string;
 
-  @Column()
+  @Column({ nullable: true })
   lastName: string;
 
-  @Column()
+  @Column({ nullable: true })
   userName: string;
 
   @Column({ nullable: true })

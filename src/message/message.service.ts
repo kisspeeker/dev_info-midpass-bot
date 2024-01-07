@@ -138,7 +138,9 @@ export class MessageService {
       order: order.formatBeauty,
     });
     const donate = this.i18n.t('user.message_donate');
-    let message = order.isNew ? this.i18n.t('user.message_order_empty') : '';
+    let message = order.isNew
+      ? this.i18n.t('user.message_order_empty', { order })
+      : '';
 
     if (type === 'changed') {
       message += this.i18n.t('user.message_order_changed');
