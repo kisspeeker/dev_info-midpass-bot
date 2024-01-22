@@ -3,12 +3,15 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Order } from './order.entity';
 
-@Entity({ name: 'midpass_order_audit_log' })
-export class OrderAuditLog {
+@Entity({ name: 'midpass_order_audit' })
+export class OrderAudit {
   @PrimaryGeneratedColumn()
   id: string;
 
@@ -53,6 +56,10 @@ export class OrderAuditLog {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @ManyToOne(() => Order, (order) => order.audits)
+  @JoinColumn({ name: 'orderUid' })
+  order: Order;
 
   get updatedAtTimeString() {
     return getLocaleDateString(this.updatedAt);

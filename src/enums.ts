@@ -4,6 +4,11 @@ export enum AutoupdateSchedules {
   // b = '*/10 * * * * *',
 }
 
+export enum DbActions {
+  Create = 'CREATE',
+  Update = 'UPDATE',
+}
+
 export enum Timeouts {
   Start = 1000 * 2,
   Text = 1000 * 2,

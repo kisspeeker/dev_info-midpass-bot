@@ -4,10 +4,10 @@ import { HttpModule } from '@nestjs/axios';
 
 import { OrdersService } from 'src/orders/orders.service';
 import { Order } from 'src/orders/entity/order.entity';
-import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
+import { OrderAudit } from 'src/orders/entity/order-audit.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderAuditLog]), HttpModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderAudit]), HttpModule],
   providers: [OrdersService],
   exports: [TypeOrmModule, OrdersService],
 })

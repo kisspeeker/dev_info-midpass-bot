@@ -20,102 +20,47 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto) {
     try {
-      const newUser = this.usersRepository.create({
-        id: String(createUserDto.id),
-        firstName: createUserDto.first_name,
-        lastName: createUserDto.last_name,
-        userName: createUserDto.username ? `@${createUserDto.username}` : '',
-        orders: [],
-      });
-
-      await this.usersRepository.save(newUser);
-      await this.appResponseService.success(
-        LogsTypes.DbUserCreated,
-        newUser.id,
-      );
-      return await this.appResponseService.success(
-        LogsTypes.TgShowUser,
-        newUser.id,
-        newUser,
-        { user: newUser },
+      return this.usersRepository.save(
+        this.usersRepository.create({
+          id: String(createUserDto.id),
+          firstName: createUserDto.first_name,
+          lastName: createUserDto.last_name,
+          userName: createUserDto.username ? `@${createUserDto.username}` : '',
+          orders: [],
+        }),
       );
     } catch (e) {
-      return await this.appResponseService.error<User>(
-        LogsTypes.ErrorUserCreate,
-        e,
-        null,
-        {
-          id: String(createUserDto.id),
-        },
-      );
+      throw e;
     }
   }
 
-  async find(createUserDto: CreateUserDto, createIfNotFound = false) {
+  async find(createUserDto: CreateUserDto) {
     try {
-      let user = await this.usersRepository.findOne({
-        where: { id: String(createUserDto.id) },
+      return await this.usersRepository.findOne({
+        where: [
+          { id: String(createUserDto.id) },
+          { userName: createUserDto.username },
+        ],
         relations: ['orders'],
       });
-
-      if (!user && createUserDto.username) {
-        user = await this.usersRepository.findOne({
-          where: { userName: createUserDto.username },
-          relations: ['orders'],
-        });
-      }
-
-      if (!user) {
-        if (createIfNotFound) {
-          const newUserResponse = await this.create(createUserDto);
-          if (newUserResponse.success === false) {
-            throw newUserResponse;
-          }
-          user = newUserResponse.data;
-        } else {
-          throw LogsTypes.ErrorUserNotFound;
-        }
-      }
-
-      return this.appResponseService.success(
-        LogsTypes.DbUserFind,
-        user.id,
-        user,
-      );
     } catch (e) {
-      return await this.appResponseService.error<User>(
-        e,
-        'error in users.service.find',
-        null,
-        { user: createUserDto },
-      );
+      throw e;
     }
   }
 
   async findAll() {
     try {
-      const users = await this.usersRepository.find({ relations: ['orders'] });
-      return await this.appResponseService.success(
-        LogsTypes.DbUsersFindAll,
-        String(users.length),
-        users,
-      );
+      return await this.usersRepository.find({ relations: ['orders'] });
     } catch (e) {
-      return await this.appResponseService.error<User[]>(
-        LogsTypes.ErrorUsersFindAll,
-        e,
-      );
+      throw e;
     }
   }
 
   async findAllFiltered() {
     try {
-      const usersResponse = await this.findAll();
-      if (usersResponse.success === false) {
-        return;
-      }
+      const usersAll = await this.findAll();
 
-      const users = usersResponse.data.filter((user) => {
+      return usersAll.filter((user) => {
         return (
           !!user.filteredOrders.length &&
           user.filteredOrders.every(
@@ -123,69 +68,38 @@ export class UsersService {
           )
         );
       });
-
-      return await this.appResponseService.success(
-        LogsTypes.DbUsersFindAllFiltered,
-        String(users.length),
-        users,
-      );
     } catch (e) {
-      return await this.appResponseService.error<User[]>(
-        LogsTypes.ErrorUsersFindWithOrders,
-        e,
-      );
+      throw e;
     }
   }
 
   async block(createUserDto: CreateUserDto) {
     try {
-      const userResponse = await this.find(createUserDto);
-      if (!userResponse.success) {
+      const user = await this.find(createUserDto);
+
+      if (user.isOwner) {
         throw LogsTypes.ErrorUserNotFound;
       }
-      const user = userResponse.data;
-      if (user.isAdmin) {
-        throw LogsTypes.ErrorUserNotFound;
-      }
+
       user.isBlocked = true;
-      await this.usersRepository.save(user);
-      return this.appResponseService.success(LogsTypes.DbUserBlocked, user.id, {
-        user,
-      });
+      return this.usersRepository.save(user);
     } catch (e) {
-      return await this.appResponseService.error<User>(
-        e,
-        'error in users.service.block',
-        null,
-        { user: createUserDto },
-      );
+      throw e;
     }
   }
 
   async unblock(createUserDto: CreateUserDto) {
     try {
-      const userResponse = await this.find(createUserDto);
-      if (!userResponse.success) {
+      const user = await this.find(createUserDto);
+
+      if (user.isOwner) {
         throw LogsTypes.ErrorUserNotFound;
       }
-      const user = userResponse.data;
-      if (user.isAdmin) {
-        throw LogsTypes.ErrorUserNotFound;
-      }
+
       user.isBlocked = false;
-      await this.usersRepository.save(user);
-      return this.appResponseService.success(
-        LogsTypes.DbUserUnblocked,
-        user.id,
-        { user },
-      );
+      return this.usersRepository.save(user);
     } catch (e) {
-      return await this.appResponseService.error<User>(
-        e,
-        'error in users.service.unblock',
-        null,
-        { user: createUserDto },
-      );
+      throw e;
     }
   }
 }

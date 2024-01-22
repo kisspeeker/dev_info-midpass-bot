@@ -14,7 +14,7 @@ import { UsersModule } from 'src/users/users.module';
 import { OrdersModule } from 'src/orders/orders.module';
 import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
-import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
+import { OrderAudit } from 'src/orders/entity/order-audit.entity';
 import { KeyboardModule } from 'src/keyboard/keyboard.module';
 import { MessageModule } from 'src/message/message.module';
 import { BotModule } from 'src/bot/bot.module';
@@ -43,7 +43,7 @@ import { AppResponseModule } from 'src/app-response/app-response.module';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'midpass.db',
-      entities: [User, Order, OrderAuditLog],
+      entities: [User, Order, OrderAudit],
       synchronize: true,
     }),
     TelegramModule,

@@ -20,12 +20,12 @@
     "{ordersBeauty}"
   ],
   "order_audit_log_beauty": [
-    "<b>updatedAt:</b> {orderAuditLog.updatedAtTimeString}\n",
-    "<b>id:</b> {orderAuditLog.id}\n",
-    "<b>newStatusName:</b> {orderAuditLog.newStatusName}\n",
-    "<b>newStatusInternalName:</b> {orderAuditLog.newStatusInternalName}\n",
-    "<b>newStatusPercent:</b> {orderAuditLog.newStatusPercent}\n",
-    "<b>isDeleted:</b> {orderAuditLog.isDeleted}"
+    "<b>updatedAt:</b> {orderAudit.updatedAtTimeString}\n",
+    "<b>id:</b> {orderAudit.id}\n",
+    "<b>newStatusName:</b> {orderAudit.newStatusName}\n",
+    "<b>newStatusInternalName:</b> {orderAudit.newStatusInternalName}\n",
+    "<b>newStatusPercent:</b> {orderAudit.newStatusPercent}\n",
+    "<b>isDeleted:</b> {orderAudit.isDeleted}"
   ],
   "order_userid": [
     "<b>🕵‍♀ Пользователь:</b>\n",

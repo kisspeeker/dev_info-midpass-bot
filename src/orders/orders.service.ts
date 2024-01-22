@@ -22,7 +22,7 @@ import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
 import { UpdateOrderDto } from 'src/orders/dto/update-order.dto';
 import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
-import { OrderAuditLog } from 'src/orders/entity/order-audit-log.entity';
+import { OrderAudit } from 'src/orders/entity/order-audit.entity';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 import { isValidDate } from 'src/utils';
 import {
@@ -36,8 +36,8 @@ export class OrdersService {
   private proxyIndex = 0;
 
   constructor(
-    @InjectRepository(OrderAuditLog)
-    private ordersAuditLogRepository: Repository<OrderAuditLog>,
+    @InjectRepository(OrderAudit)
+    private ordersAuditLogRepository: Repository<OrderAudit>,
     @InjectRepository(Order)
     private ordersRepository: Repository<Order>,
     private readonly logger: LoggerService,
@@ -108,16 +108,7 @@ export class OrdersService {
     }
   }
 
-  private async getStatusFromMidpass(order: Order): Promise<
-    | AppResponseSuccess<{
-        proxy: string;
-        updateOrderDto?: UpdateOrderDto;
-      }>
-    | AppResponseError<{
-        proxy: string;
-        updateOrderDto?: UpdateOrderDto;
-      }>
-  > {
+  private async getStatusFromMidpass(order: Order) {
     const proxy =
       API_ROUTE_MIDPASS_PROXIES[
         this.proxyIndex % API_ROUTE_MIDPASS_PROXIES.length
@@ -135,30 +126,14 @@ export class OrdersService {
       if (!updateOrderDto) {
         throw LogsTypes.ErrorOrderRequestMidpassNotFound;
       }
-      return await this.appResponseService.success(
-        LogsTypes.OrderRequestMidpass,
-        updateOrderDto.uid,
-        {
-          updateOrderDto,
-          proxy,
-        },
-      );
+
+      return updateOrderDto;
     } catch (e) {
       if (e instanceof TimeoutError) {
-        return await this.appResponseService.error(
-          LogsTypes.ErrorMidpassTimeout,
-          e?.message || 'error in order.service.update',
-          { proxy },
-        );
-      } else {
-        return await this.appResponseService.error(
-          LogsTypes.ErrorOrderRequest,
-          e,
-          {
-            proxy,
-          },
-        );
+        throw LogsTypes.ErrorMidpassTimeout;
       }
+
+      throw e;
     } finally {
       this.proxyIndex++;
     }
@@ -171,11 +146,7 @@ export class OrdersService {
       }, 0);
 
       if (activeOrdersCount >= MAX_ORDERS_PER_USER) {
-        throw {
-          type: LogsTypes.ErrorMaxOrdersPerUser,
-          message: createOrderDto.uid,
-          meta: { user },
-        };
+        throw LogsTypes.ErrorMaxOrdersPerUser;
       }
 
       const existingOrder = await this.ordersRepository.findOneBy({
@@ -184,38 +155,25 @@ export class OrdersService {
       });
 
       if (existingOrder && existingOrder.userId !== user.id) {
-        throw {
-          type: LogsTypes.ErrorUserNotAllowedToUpdateOrder,
-          message: createOrderDto.uid,
-          meta: { user, order: existingOrder },
-        };
+        throw LogsTypes.ErrorUserNotAllowedToUpdateOrder;
       }
 
-      const newOrder = this.ordersRepository.create({
-        uid: String(createOrderDto.uid),
-        shortUid: OrdersService.parseShortUidFromUid(createOrderDto.uid),
-        receptionDate: OrdersService.parseReceptionDateFromUid(
-          createOrderDto.uid,
-        ),
-        isDeleted: false,
-        user,
-      });
-
-      await this.ordersRepository.save(newOrder);
+      const newOrder = await this.ordersRepository.save(
+        this.ordersRepository.create({
+          uid: String(createOrderDto.uid),
+          shortUid: OrdersService.parseShortUidFromUid(createOrderDto.uid),
+          receptionDate: OrdersService.parseReceptionDateFromUid(
+            createOrderDto.uid,
+          ),
+          isDeleted: false,
+          user,
+        }),
+      );
       await this.createAuditLog(newOrder, user.id);
 
-      return await this.appResponseService.success(
-        LogsTypes.DbOrderCreated,
-        newOrder.uid,
-        newOrder,
-      );
+      return newOrder;
     } catch (e) {
-      return await this.appResponseService.error(
-        (e?.type as LogsTypes) || e,
-        e?.message || 'error in order.service.create',
-        null,
-        e?.meta || {},
-      );
+      throw e;
     }
   }
 
@@ -235,12 +193,7 @@ export class OrdersService {
         isDeleted: newOrder.isDeleted,
       });
 
-      const res = await this.ordersAuditLogRepository.save(auditLog);
-      this.appResponseService.success(
-        LogsTypes.DbOrderAuditCreated,
-        res.id,
-        null,
-      );
+      return await this.ordersAuditLogRepository.save(auditLog);
     } catch (e) {
       this.appResponseService.error(LogsTypes.Error, e);
     }
@@ -253,39 +206,24 @@ export class OrdersService {
   async update(existingOrder: Order, userId: string) {
     try {
       const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
-      const midpassResponse = await this.getStatusFromMidpass(existingOrder);
-      const updateOrderDto = midpassResponse.data.updateOrderDto;
+      const updateOrderDto = await this.getStatusFromMidpass(existingOrder);
 
-      if (midpassResponse.success === false || !updateOrderDto) {
-        throw midpassResponse;
-      } else {
-        (existingOrder.sourceUid = updateOrderDto.sourceUid),
-          (existingOrder.receptionDate = updateOrderDto.receptionDate),
-          (existingOrder.statusId =
-            updateOrderDto.passportStatus.passportStatusId),
-          (existingOrder.statusName = updateOrderDto.passportStatus.name),
-          (existingOrder.statusDescription =
-            updateOrderDto.passportStatus.description),
-          (existingOrder.statusColor = updateOrderDto.passportStatus.color),
-          (existingOrder.statusSubscription =
-            updateOrderDto.passportStatus.subscription),
-          (existingOrder.statusInternalName =
-            updateOrderDto.internalStatus.name),
-          (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
-          (existingOrder.isDeleted = false),
-          await this.ordersRepository.save(existingOrder);
+      (existingOrder.sourceUid = updateOrderDto.sourceUid),
+        (existingOrder.receptionDate = updateOrderDto.receptionDate),
+        (existingOrder.statusId =
+          updateOrderDto.passportStatus.passportStatusId),
+        (existingOrder.statusName = updateOrderDto.passportStatus.name),
+        (existingOrder.statusDescription =
+          updateOrderDto.passportStatus.description),
+        (existingOrder.statusColor = updateOrderDto.passportStatus.color),
+        (existingOrder.statusSubscription =
+          updateOrderDto.passportStatus.subscription),
+        (existingOrder.statusInternalName = updateOrderDto.internalStatus.name),
+        (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
+        (existingOrder.isDeleted = false),
+        await this.ordersRepository.save(existingOrder);
 
-        await this.createAuditLog(existingOrder, userId, oldOrder);
-      }
-
-      return await this.appResponseService.success(
-        LogsTypes.DbOrderUpdated,
-        existingOrder.uid,
-        {
-          order: existingOrder,
-          proxy: midpassResponse.data.proxy,
-        },
-      );
+      await this.createAuditLog(existingOrder, userId, oldOrder);
     } catch (e) {
       return e;
     }
@@ -293,137 +231,75 @@ export class OrdersService {
 
   async findAll() {
     try {
-      const orders = await this.ordersRepository.find();
-      return this.appResponseService.success(
-        LogsTypes.DbOrdersFindAll,
-        String(orders.length),
-        orders,
-      );
+      return await this.ordersRepository.find();
     } catch (e) {
-      return await this.appResponseService.error<Order[]>(
-        LogsTypes.Error,
-        'error in orders.service.findAll',
-      );
+      throw e;
     }
   }
 
   async find(uid: string) {
     try {
-      const order = await this.ordersRepository.findOneBy({
+      return await this.ordersRepository.findOneBy({
         uid,
       });
-      return await this.appResponseService.success(
-        LogsTypes.DbOrderFind,
-        order.uid,
-        order,
-      );
     } catch (e) {
-      return await this.appResponseService.error<Order>(
-        LogsTypes.Error,
-        'error in orders.service.find',
-      );
+      throw e;
     }
   }
 
   async findAllFiltered() {
     try {
-      const orders = await this.ordersRepository.findBy({
+      return await this.ordersRepository.findBy({
         isDeleted: false,
       });
-      return await this.appResponseService.success(
-        LogsTypes.DbOrdersFindAllFiltered,
-        String(orders.length),
-        orders,
-      );
     } catch (e) {
-      return await this.appResponseService.error<Order[]>(
-        LogsTypes.Error,
-        'error in orders.service.findAllFiltered',
-      );
+      throw e;
     }
   }
 
   async delete(uid: string, user: User) {
     try {
-      const existingOrder = await this.ordersRepository.findOneBy({
-        uid,
-      });
+      const result = await this.ordersRepository
+        .createQueryBuilder()
+        .update(Order)
+        .set({ isDeleted: true })
+        .where({ uid, userId: user.id })
+        .returning('*') // updatedOrder
+        .execute();
 
-      if (existingOrder) {
-        if (existingOrder.userId !== user.id) {
-          throw {
-            type: LogsTypes.ErrorUserNotAllowedToUpdateOrder,
-            message: uid,
-            data: null,
-            meta: { user, order: existingOrder },
-          };
-        }
+      const updatedOrder = result.raw[0];
 
-        existingOrder.isDeleted = true;
-        await this.ordersRepository.save(existingOrder);
-        await this.createAuditLog(existingOrder, user.id);
-
-        return await this.appResponseService.success(
-          LogsTypes.DbOrderDeleted,
-          existingOrder.uid,
-          existingOrder,
-        );
-      } else {
-        throw {
-          type: LogsTypes.ErrorOrderNotFound,
-          message: uid,
-          meta: { user },
-        };
+      if (!updatedOrder) {
+        throw LogsTypes.ErrorOrderNotFound;
       }
+
+      await this.createAuditLog(updatedOrder, user.id);
     } catch (e) {
-      return await this.appResponseService.error(
-        e?.type || LogsTypes.ErrorOrderNotFound,
-        e?.message || 'error in orders.service.delete',
-        null,
-        e?.meta || { user },
-      );
+      throw e;
     }
   }
 
   async deleteAll(user: User) {
     try {
-      const existingOrders = await this.ordersRepository.findBy({
-        userId: user.id,
-      });
+      const result = await this.ordersRepository
+        .createQueryBuilder()
+        .update(Order)
+        .set({ isDeleted: true })
+        .where({ userId: user.id, isDeleted: false }) // Добавляем условие isDeleted: false, чтобы не обновлять уже удаленные заказы
+        .returning('*') // Order[]
+        .execute();
 
-      if (Array.isArray(existingOrders) && existingOrders.length) {
-        existingOrders.forEach((order) => {
-          order.isDeleted = true;
-        });
+      const updatedOrders = result.raw as Order[];
 
-        await this.ordersRepository.save(existingOrders);
-
-        for (const order of existingOrders) {
-          this.appResponseService.success(
-            LogsTypes.DbOrderDeleted,
-            order.uid,
-            order,
-          );
+      if (updatedOrders.length > 0) {
+        for (const order of updatedOrders) {
           await this.createAuditLog(order, user.id);
         }
-
-        return await this.appResponseService.success(
-          LogsTypes.DbOrdersDeletedAll,
-          user.id,
-          existingOrders,
-          { user },
-        );
       } else {
-        throw {
-          type: LogsTypes.ErrorOrdersNotFound,
-          message: user.id,
-        };
+        throw LogsTypes.ErrorOrdersNotFound;
       }
     } catch (e) {
-      return await this.appResponseService.error(
-        e?.type || LogsTypes.Error,
-        e?.message || 'error in orders.service.deleteAll',
-      );
+      throw e;
     }
   }
 }

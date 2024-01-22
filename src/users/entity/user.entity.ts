@@ -8,11 +8,10 @@ import {
 } from 'typeorm';
 
 import { Order } from 'src/orders/entity/order.entity';
+import { TG_OWNER_ID } from 'src/constants';
 
 @Entity({ name: 'telegram_user' })
 export class User {
-  private readonly adminId: string = process.env.TG_ADMIN_ID;
-
   @PrimaryColumn()
   id: string;
 
@@ -41,8 +40,8 @@ export class User {
     return this.orders.filter((order) => !order.isDeleted);
   }
 
-  get isAdmin() {
-    return this.id === this.adminId;
+  get isOwner() {
+    return this.id === TG_OWNER_ID;
   }
 
   get ordersFormatBeauty() {

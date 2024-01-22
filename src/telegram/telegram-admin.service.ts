@@ -33,7 +33,7 @@ export class TelegramAdminService {
   }
 
   async handleCommands(ctx: AppContext, user: User) {
-    if (!user.isAdmin) {
+    if (!user.isOwner) {
       return;
     }
 

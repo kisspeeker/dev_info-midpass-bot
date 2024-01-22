@@ -9,24 +9,24 @@ import { KeyboardService } from './keyboard/keyboard.service';
 
 const mockUsersPart = [
   {
-    adminId: 'admin',
-    id: 'admin',
-    userName: 'admin',
+    ownerId: 'ownerId',
+    id: 'ownerId',
+    userName: 'ownerUserName',
   },
   {
-    adminId: 'admin',
+    ownerId: 'ownerId',
     id: '1',
     firstName: 'user',
     isBlocked: false,
   },
   {
-    adminId: 'admin',
+    ownerId: 'ownerId',
     id: '2',
     firstName: 'blocked user',
     isBlocked: true,
   },
   {
-    adminId: 'admin',
+    ownerId: 'ownerId',
     id: '403',
     firstName: '403 blocked by user',
   },
@@ -34,7 +34,7 @@ const mockUsersPart = [
 
 const mockOrdersPart = [
   {
-    userId: 'admin',
+    userId: 'ownerId',
     uid: '2000971012023061500000000',
   },
   {

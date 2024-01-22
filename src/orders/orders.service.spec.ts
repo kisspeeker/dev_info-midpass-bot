@@ -10,7 +10,7 @@ import { LoggerService } from 'src/logger/logger.service';
 
 import { OrdersService } from 'src/orders/orders.service';
 import { Order } from './entity/order.entity';
-import { OrderAuditLog } from './entity/order-audit-log.entity';
+import { OrderAudit } from './entity/order-audit.entity';
 import { HttpService } from '@nestjs/axios';
 import { FALSY_PASSPORT_STATUSES } from 'src/constants';
 import { isValidDate } from 'src/utils';
@@ -82,7 +82,7 @@ describe('OrdersService', () => {
           useValue: ordersRepository,
         },
         {
-          provide: getRepositoryToken(OrderAuditLog),
+          provide: getRepositoryToken(OrderAudit),
           useValue: ordersAuditLogRepository,
         },
       ],

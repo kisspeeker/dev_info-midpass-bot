@@ -2,7 +2,7 @@
 const rateLimit = require('telegraf-ratelimit');
 
 import { Injectable } from '@nestjs/common';
-import { TG_RATE_LIMIT } from 'src/constants';
+import { TG_OWNER_ID, TG_RATE_LIMIT } from 'src/constants';
 import { BotCommands } from 'src/enums';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
 import { Context, NarrowedContext, Telegraf, session } from 'telegraf';
@@ -31,7 +31,6 @@ export type AppContextAction = NarrowedContext<
 @Injectable()
 export class BotService {
   public bot: Telegraf;
-  private adminId: string = process.env.TG_ADMIN_ID;
   private isUnderConstruction: boolean =
     process.env.IS_UNDER_CONSTRUCTION === 'true';
 
@@ -65,7 +64,7 @@ export class BotService {
 
   async notify(message: string) {
     try {
-      await this.bot.telegram.sendMessage(this.adminId, message, {
+      await this.bot.telegram.sendMessage(TG_OWNER_ID, message, {
         parse_mode: 'HTML',
       });
     } catch (e) {
