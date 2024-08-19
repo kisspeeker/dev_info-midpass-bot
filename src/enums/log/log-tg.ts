@@ -1,0 +1,21 @@
+export enum LogTg {
+  TgBotStart = 'TG_BOT_START',
+  TgMessageSent = 'TG_MESSAGE_SENT',
+  TgOrdersSent = 'TG_ORDERS_SENT',
+  TgStatusSent = 'TG_STATUS_SENT',
+  TgUnsubscribeSent = 'TG_UNSUBSCRIBE_SENT',
+  TgAdminMessageSent = 'TG_ADMIN_MESSAGE_SENT',
+  TgShowOrder = 'TG_SHOW_ORDER',
+  TgShowUser = 'TG_SHOW_USER',
+
+  TgUserStart = 'TG_USER_START',
+  TgUserSupport = 'TG_USER_SUPPORT',
+  TgUserUnsubscribed = 'TG_USER_UNSUBSCRIBED',
+  TgUserSubscribed = 'TG_USER_SUBSCRIBED',
+  TgUserSubscribedAlready = 'TG_USER_SUBSCRIBED_ALREADY',
+  TgUserOrderStatus = 'TG_USER_ORDER_STATUS',
+  TgUserFaqBase = 'TG_USER_FAQ_BASE',
+  TgUserFaqStatuses = 'TG_USER_FAQ_STATUSES',
+  TgUserSchedule = 'TG_USER_SCHEDULE',
+  TgUserContacts = 'TG_USER_CONTACTS',
+}

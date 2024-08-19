@@ -1,0 +1,16 @@
+export enum LogDb {
+  DbUserCreated = 'DB_USER_CREATED',
+  DbUserFind = 'DB_USER_FIND',
+  DbUserBlocked = 'DB_USER_BLOCKED',
+  DbUserUnblocked = 'DB_USER_UNBLOCKED',
+  DbUsersFindAll = 'DB_USERS_FIND_ALL',
+  DbUsersFindAllFiltered = 'DB_USERS_GET_ALL_WITH_ORDERS',
+  DbOrderFind = 'DB_ORDER_FIND',
+  DbOrderCreated = 'DB_ORDER_CREATED',
+  DbOrderUpdated = 'DB_ORDER_UPDATED',
+  DbOrderDeleted = 'DB_ORDER_DELETED',
+  DbOrdersDeletedAll = 'DB_ORDERS_DELETED_ALL',
+  DbOrdersFindAll = 'DB_ORDERS_GET_ALL',
+  DbOrdersFindAllFiltered = 'DB_ORDERS_GET_ALL_FILTERED',
+  DbOrderAuditCreated = 'DB_ORDER_AUDIT_CREATED',
+}
