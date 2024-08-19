@@ -1,84 +1,62 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const rateLimit = require('telegraf-ratelimit');
+import rateLimit from 'telegraf-ratelimit';
 
 import { Injectable } from '@nestjs/common';
-import { TG_OWNER_ID, TG_RATE_LIMIT } from 'src/constants';
-import { BotCommands } from 'src/enums';
+import { IS_UNDER_CONSTRUCTION } from 'src/constants/is-under-construction';
+import { TG_BOT_TOKEN } from 'src/constants/tg-bot-token';
+import { TG_OWNER_ID } from 'src/constants/tg-owner-id';
+import { TG_RATE_LIMIT } from 'src/constants/tg-rate-limit';
+import { CmdBot } from 'src/enums/cmd/cmd-bot';
 import { CustomI18nService } from 'src/i18n/custom-i18n.service';
-import { Context, NarrowedContext, Telegraf, session } from 'telegraf';
-import {
-  CallbackQuery,
-  Message,
-  Update,
-} from 'telegraf/typings/core/types/typegram';
-
-interface SessionData {
-  awaitingSupportMessage: boolean;
-}
-
-export interface AppContext extends Context {
-  session?: SessionData;
-  message: Update.New & Update.NonChannel & Message.TextMessage;
-}
-
-export type AppContextAction = NarrowedContext<
-  Context<Update> & {
-    match: RegExpExecArray;
-  },
-  Update.CallbackQueryUpdate<CallbackQuery>
->;
+import { AppContext } from 'src/types/app-context';
+import { Telegraf, session } from 'telegraf';
 
 @Injectable()
 export class BotService {
   public bot: Telegraf;
-  private isUnderConstruction: boolean =
-    process.env.IS_UNDER_CONSTRUCTION === 'true';
 
-  constructor(private readonly i18n: CustomI18nService) {
-    const rateLimitMiddleware = rateLimit({
+  public constructor(private readonly i18n: CustomI18nService) {
+    this.bot = new Telegraf<AppContext>(TG_BOT_TOKEN, {
+      telegram: { webhookReply: false },
+    });
+    this.bot.use(this.createRateLimitMiddleware());
+    this.bot.use(this.createDefaultBotSession());
+  }
+
+  private get botCommands() {
+    return Object.values(CmdBot).map(command => ({
+      command,
+      description: this.i18n.t(`user.command_${command}`),
+    }));
+  }
+
+  private createRateLimitMiddleware() {
+    return rateLimit({
       window: TG_RATE_LIMIT,
       limit: 1,
-      onLimitExceeded: (ctx) => {
+      onLimitExceeded: ctx => {
         // ctx.reply(this.i18n.t('user_errors.message_rate_limit'));
         this.notify(this.i18n.t('admin.user_spaming', { id: ctx.from.id }));
       },
     });
-
-    this.bot = new Telegraf<AppContext>(process.env.TG_BOT_TOKEN, {
-      telegram: { webhookReply: false },
-    });
-    this.bot.use(rateLimitMiddleware);
-    this.bot.use(
-      session({ defaultSession: () => ({ awaitingSupportMessage: false }) }),
-    );
   }
 
-  get botCommands() {
-    return Object.values(BotCommands).map((command) => {
-      return {
-        command,
-        description: this.i18n.t(`user.command_${command}`),
-      };
+  private createDefaultBotSession() {
+    return session({
+      defaultSession: () => ({ awaitingSupportMessage: false }),
     });
   }
 
-  async notify(message: string) {
-    try {
-      await this.bot.telegram.sendMessage(TG_OWNER_ID, message, {
-        parse_mode: 'HTML',
-      });
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
+  public async notify(message: string) {
+    return this.bot.telegram.sendMessage(TG_OWNER_ID, message, {
+      parse_mode: 'HTML',
+    });
   }
 
-  async startBot() {
-    if (this.isUnderConstruction) {
-      this.bot.launch();
-    } else {
+  public async startBot() {
+    if (!IS_UNDER_CONSTRUCTION) {
       await this.bot.telegram.setMyCommands(this.botCommands);
-      await this.bot.launch();
     }
+
+    return this.bot.launch();
   }
 }

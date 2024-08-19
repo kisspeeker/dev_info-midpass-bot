@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 export function declOfNum(number: number, titles: string[]) {
   const cases = [2, 0, 1, 1, 1, 2];
   return titles[

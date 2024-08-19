@@ -1,20 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { I18nService } from 'nestjs-i18n';
+import { Language } from 'src/enums/language';
 
 @Injectable()
 export class CustomI18nService {
   constructor(private readonly i18n: I18nService) {}
 
-  t(key: string, params?: Record<string, unknown>, lang = 'ru') {
+  t(key: string, params?: Record<string, unknown>, lang = Language.RU) {
     const res = this.i18n.t(key, {
       args: params,
       lang,
     });
 
-    if (Array.isArray(res)) {
-      return String(res.join(''));
-    }
-    return String(res);
+    return Array.isArray(res) ? String(res.join('')) : String(res);
   }
 
   tExist(messageKey: string, ...args) {
