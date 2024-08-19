@@ -2,49 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { createLogger, transports, format } from 'winston';
 import * as DailyRotateFile from 'winston-daily-rotate-file';
 
-import { LogsTypes } from 'src/enums';
+import { DAILY_ROTATE_OPTIONS } from 'src/logger/constants/daily-rotate-options';
+import { formatLog } from 'src/logger/helpers/format-log';
+import { LogType } from 'src/logger/constants/log-types';
 
 @Injectable()
 export class LoggerService {
   private logger = createLogger({
-    format: format.combine(
-      format.printf(({ level, message, logtype, meta }) => {
-        const date = new Intl.DateTimeFormat('ru-RU', {
-          timeStyle: 'medium',
-          dateStyle: 'short',
-          timeZone: 'Europe/Moscow',
-        })
-          .format()
-          .replace(/\./g, '-');
-
-        const metaString = meta ? `META<<<${JSON.stringify(meta)}>>>META` : '';
-
-        return `${date} мск / ${logtype} [${level}]: ${message} ${metaString}`;
-      }),
-    ),
+    format: format.combine(format.printf(formatLog)),
 
     transports: [
       new transports.Console(), // Запись в консоль
-      new DailyRotateFile({
-        filename: 'logs/%DATE%-midpass-bot.log',
-        datePattern: 'DD-MM-YYYY',
-        utc: true,
-        zippedArchive: true,
-        maxSize: '20m',
-        maxFiles: '6m',
-      }),
+      new DailyRotateFile(DAILY_ROTATE_OPTIONS),
     ],
   });
 
-  log(logtype: LogsTypes, message: string, meta?: unknown) {
+  log(logtype: LogType, message: string, meta?: unknown) {
     this.logger.info(message, { logtype, meta });
   }
 
-  error(logtype: LogsTypes, message: string, meta?: unknown) {
+  error(logtype: LogType, message: string, meta?: unknown) {
     this.logger.error(message, { logtype, meta });
   }
 
-  warn(logtype: LogsTypes, message: string, meta?: unknown) {
+  warn(logtype: LogType, message: string, meta?: unknown) {
     this.logger.warn(message, { logtype, meta });
   }
 }

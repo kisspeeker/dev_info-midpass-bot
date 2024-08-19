@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 export function declOfNum(number: number, titles: string[]) {
   const cases = [2, 0, 1, 1, 1, 2];
   return titles[
@@ -15,6 +13,16 @@ export function getLocaleDateString(date: string | Date) {
     dateStyle: 'short',
     timeZone: 'Europe/Moscow',
   });
+}
+
+export function getLocaleDateStringFormatted() {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeStyle: 'medium',
+    dateStyle: 'short',
+    timeZone: 'Europe/Moscow',
+  })
+    .format()
+    .replace(/\./g, '-');
 }
 
 export function calculateTimeDifference(startDate, endDate = new Date()) {
@@ -49,5 +57,5 @@ export function isValidDate(checkingDate: string | Date) {
 }
 
 export async function sleep(delay: number = 100) {
-  await new Promise((resolve) => setTimeout(resolve, delay));
+  await new Promise(resolve => setTimeout(resolve, delay));
 }
