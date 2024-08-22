@@ -2,46 +2,36 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { LogsTypes } from 'src/enums';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/users/entity/user.entity';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { AppResponseService } from 'src/app-response/app-response.service';
-import { OrdersService } from 'src/orders/orders.service';
+import { TelegramUser } from 'src/types/telegram-user';
+import { getFilterUserByOrder } from 'src/users/constants/filter-users-by-order';
+import { getFilterFindUser } from 'src/users/constants/filter-find-user';
+import { getFilterRelations } from 'src/users/constants/filter-relations';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    // TODO: добавить вывод логов
     private readonly logger: LoggerService,
-    private readonly appResponseService: AppResponseService,
   ) {}
 
-  async create(createUserDto: CreateUserDto) {
+  async create(telegramUser: TelegramUser) {
     try {
-      return this.usersRepository.save(
-        this.usersRepository.create({
-          id: String(createUserDto.id),
-          firstName: createUserDto.first_name,
-          lastName: createUserDto.last_name,
-          userName: createUserDto.username ? `@${createUserDto.username}` : '',
-          orders: [],
-        }),
-      );
+      const user = this.usersRepository.create(new User(telegramUser));
+      return this.usersRepository.save(user);
     } catch (e) {
       throw e;
     }
   }
 
-  async find(createUserDto: CreateUserDto) {
+  async find(telegramUser: TelegramUser, isOwner?: User['isOwner']) {
     try {
       return await this.usersRepository.findOne({
-        where: [
-          { id: String(createUserDto.id) },
-          { userName: createUserDto.username },
-        ],
-        relations: ['orders'],
+        where: getFilterFindUser(telegramUser, isOwner),
+        relations: getFilterRelations(),
       });
     } catch (e) {
       throw e;
@@ -50,7 +40,9 @@ export class UsersService {
 
   async findAll() {
     try {
-      return await this.usersRepository.find({ relations: ['orders'] });
+      return this.usersRepository.find({
+        relations: getFilterRelations(),
+      });
     } catch (e) {
       throw e;
     }
@@ -58,28 +50,18 @@ export class UsersService {
 
   async findAllFiltered() {
     try {
-      const usersAll = await this.findAll();
-
-      return usersAll.filter((user) => {
-        return (
-          !!user.filteredOrders.length &&
-          user.filteredOrders.every(
-            (order) => !OrdersService.isCompleteOrder(order),
-          )
-        );
+      return this.usersRepository.find({
+        where: getFilterUserByOrder(),
+        relations: getFilterRelations(),
       });
     } catch (e) {
       throw e;
     }
   }
 
-  async block(createUserDto: CreateUserDto) {
+  async block(telegramUser: TelegramUser) {
     try {
-      const user = await this.find(createUserDto);
-
-      if (user.isOwner) {
-        throw LogsTypes.ErrorUserNotFound;
-      }
+      const user = await this.find(telegramUser);
 
       user.isBlocked = true;
       return this.usersRepository.save(user);
@@ -88,13 +70,9 @@ export class UsersService {
     }
   }
 
-  async unblock(createUserDto: CreateUserDto) {
+  async unblock(telegramUser: TelegramUser) {
     try {
-      const user = await this.find(createUserDto);
-
-      if (user.isOwner) {
-        throw LogsTypes.ErrorUserNotFound;
-      }
+      const user = await this.find(telegramUser);
 
       user.isBlocked = false;
       return this.usersRepository.save(user);

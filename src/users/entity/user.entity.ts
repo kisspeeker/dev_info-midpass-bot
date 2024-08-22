@@ -8,10 +8,19 @@ import {
 } from 'typeorm';
 
 import { Order } from 'src/orders/entity/order.entity';
-import { TG_OWNER_ID } from 'src/constants';
+import { TelegramUser } from 'src/types/telegram-user';
+import { DB_USER_TABLE_NAME } from 'src/constants/db-user-table-name';
+import { TG_OWNER_ID } from 'src/constants/tg-owner-id';
 
-@Entity({ name: 'telegram_user' })
+@Entity({ name: DB_USER_TABLE_NAME })
 export class User {
+  constructor({ id, first_name, last_name, username }: TelegramUser) {
+    this.id = String(id);
+    this.firstName = first_name;
+    this.lastName = last_name;
+    this.userName = username ? `@${username}` : '';
+  }
+
   @PrimaryColumn()
   id: string;
 
@@ -33,18 +42,15 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => Order, (order) => order.user)
+  @OneToMany(() => Order, order => order.user)
   orders: Order[];
-
-  get filteredOrders() {
-    return this.orders.filter((order) => !order.isDeleted);
-  }
 
   get isOwner() {
     return this.id === TG_OWNER_ID;
   }
 
+  // TODO: мб убрать отсюда
   get ordersFormatBeauty() {
-    return this.orders.map((order) => order.formatBeauty).join('\n\n');
+    return this.orders.map(order => order.formatBeauty).join('\n\n');
   }
 }

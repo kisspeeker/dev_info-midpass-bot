@@ -6,16 +6,16 @@ import {
   ManyToOne,
   PrimaryColumn,
   UpdateDateColumn,
-  BeforeInsert,
   OneToMany,
   BeforeUpdate,
 } from 'typeorm';
 import { User } from 'src/users/entity/user.entity';
 import { calculateDaysDifference, getLocaleDateString } from 'src/utils';
 import { OrderAudit } from './order-audit.entity';
-import { DbActions } from 'src/enums';
+import { DB_ORDER_TABLE_NAME } from 'src/constants/db-order-table-name';
+import { DbActions } from 'src/enums/db-actions';
 
-@Entity({ name: 'midpass_order' })
+@Entity({ name: DB_ORDER_TABLE_NAME })
 export class Order {
   @PrimaryColumn()
   uid: string;
@@ -62,11 +62,11 @@ export class Order {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToOne(() => User, (user) => user.orders)
+  @ManyToOne(() => User, user => user.orders)
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @OneToMany(() => OrderAudit, (audit) => audit.order)
+  @OneToMany(() => OrderAudit, audit => audit.order)
   audits: OrderAudit[];
 
   // private originalValue: Order;
