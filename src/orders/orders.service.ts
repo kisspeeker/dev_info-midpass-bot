@@ -1,305 +1,115 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const fs = require('fs');
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { HttpService } from '@nestjs/axios';
 import { Repository } from 'typeorm';
-import { TimeoutError, firstValueFrom, timeout } from 'rxjs';
-import { resolve } from 'path';
 
-import {
-  API_ROUTE_MIDPASS_PROXIES,
-  ORDER_UID_LENGTH,
-  ORDER_UID_SHORT_LENGTH,
-  FALSY_PASSPORT_STATUSES,
-  MAX_ORDERS_PER_USER,
-  API_MIDPASS_NETWORK_TIMEOUT,
-} from 'src/constants';
-import { LogsTypes } from 'src/enums';
-import { LoggerService } from 'src/logger/logger.service';
-import { CreateOrderDto } from 'src/orders/dto/create-order.dto';
-import { UpdateOrderDto } from 'src/orders/dto/update-order.dto';
-import { User } from 'src/users/entity/user.entity';
 import { Order } from 'src/orders/entity/order.entity';
-import { OrderAudit } from 'src/orders/entity/order-audit.entity';
-import { CustomI18nService } from 'src/i18n/custom-i18n.service';
-import { isValidDate } from 'src/utils';
-import {
-  AppResponseError,
-  AppResponseService,
-  AppResponseSuccess,
-} from 'src/app-response/app-response.service';
+import { filterActive, filterOrder, filterOrderByUser } from 'src/constants/filters';
+import { ApiService } from 'src/api/api.service';
+import { FindUserOrderParams } from 'src/types/filter-types';
+import { LogError } from 'src/logger/enums/log-error';
 
 @Injectable()
 export class OrdersService {
-  private proxyIndex = 0;
-
   constructor(
-    @InjectRepository(OrderAudit)
-    private ordersAuditLogRepository: Repository<OrderAudit>,
     @InjectRepository(Order)
     private ordersRepository: Repository<Order>,
-    private readonly logger: LoggerService,
-    private readonly i18n: CustomI18nService,
-    private readonly httpService: HttpService,
-    private readonly appResponseService: AppResponseService,
+    private readonly apiService: ApiService,
   ) {}
 
-  static isValidUid(uid = '') {
-    const str = String(uid);
+  static validate({ order, userId }: { order: Order; userId: Order['userId'] }) {
+    if (order.userId !== userId) {
+      throw LogError.ErrorUserNotAllowedToUpdateOrder;
+    }
 
-    return (
-      uid &&
-      str.length === ORDER_UID_LENGTH &&
-      str.startsWith('2000') &&
-      OrdersService.parseReceptionDateFromUid(str) !== '-'
-    );
+    return true;
   }
 
-  static isValidUidShort(shortUid = '') {
-    return shortUid && String(shortUid).length === ORDER_UID_SHORT_LENGTH + 1;
-  }
-
-  static parseShortUidFromUid(uid = '') {
-    return `*${uid.slice(-ORDER_UID_SHORT_LENGTH)}`;
-  }
-
-  static isCompleteOrder(order: Order) {
-    return (
-      order.statusPercent === 0 &&
-      FALSY_PASSPORT_STATUSES.includes(order.statusInternalName.toLowerCase())
-    );
-  }
-
-  static parseReceptionDateFromUid(uid = '') {
+  async create({ uid, userId }: FindUserOrderParams) {
     try {
-      const [, , year, month, day] = String(uid).match(
-        /^(\d{9})(\d{4})(\d{2})(\d{2})/,
-      );
-      const result = `${year}-${month}-${day}`;
-      return isValidDate(result) ? result : '-';
-    } catch (e) {
-      // console.error(e);
-      return '-';
+      const midpassOrder = await this.apiService.getStatusFromMidpass({ uid });
+      const order = this.ordersRepository.create({ ...midpassOrder, userId });
+
+      return this.ordersRepository.save(order);
+    } catch (err) {
+      throw err;
     }
   }
 
-  static isDifferentOrders(currentOrder: Order, newOrder: Order) {
-    return (
-      currentOrder.statusPercent !== newOrder.statusPercent ||
-      currentOrder.statusName !== newOrder.statusName ||
-      currentOrder.statusInternalName !== newOrder.statusInternalName
-    );
-  }
-
-  static async getStatusImage(order: Order) {
+  async find({ uid, userId }: FindUserOrderParams) {
     try {
-      const statusImagePath = resolve(
-        `./public/images/${order.statusPercent}.png`,
-      );
-      if (fs.existsSync(statusImagePath)) {
-        return fs.createReadStream(statusImagePath);
-      }
-      return fs.createReadStream(resolve('./public/images/fallback.png'));
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }
-
-  private async getStatusFromMidpass(order: Order) {
-    const proxy =
-      API_ROUTE_MIDPASS_PROXIES[
-        this.proxyIndex % API_ROUTE_MIDPASS_PROXIES.length
-      ];
-
-    try {
-      const updateOrderDto = (
-        await firstValueFrom(
-          this.httpService
-            .get(`${proxy}/${order.uid}`)
-            .pipe(timeout(API_MIDPASS_NETWORK_TIMEOUT)),
-        )
-      ).data;
-
-      if (!updateOrderDto) {
-        throw LogsTypes.ErrorOrderRequestMidpassNotFound;
-      }
-
-      return updateOrderDto;
-    } catch (e) {
-      if (e instanceof TimeoutError) {
-        throw LogsTypes.ErrorMidpassTimeout;
-      }
-
-      throw e;
-    } finally {
-      this.proxyIndex++;
-    }
-  }
-
-  async create(createOrderDto: CreateOrderDto, user: User) {
-    try {
-      const activeOrdersCount = user.orders.reduce((count, order) => {
-        return order.isDeleted ? count : count + 1;
-      }, 0);
-
-      if (activeOrdersCount >= MAX_ORDERS_PER_USER) {
-        throw LogsTypes.ErrorMaxOrdersPerUser;
-      }
-
-      const existingOrder = await this.ordersRepository.findOneBy({
-        uid: createOrderDto.uid,
-        isDeleted: false,
+      const order = await this.ordersRepository.findOne({
+        where: filterOrder({ uid }),
       });
 
-      if (existingOrder && existingOrder.userId !== user.id) {
-        throw LogsTypes.ErrorUserNotAllowedToUpdateOrder;
+      if (!order) {
+        return this.create({ uid, userId });
       }
 
-      const newOrder = await this.ordersRepository.save(
-        this.ordersRepository.create({
-          uid: String(createOrderDto.uid),
-          shortUid: OrdersService.parseShortUidFromUid(createOrderDto.uid),
-          receptionDate: OrdersService.parseReceptionDateFromUid(
-            createOrderDto.uid,
-          ),
-          isDeleted: false,
-          user,
-        }),
-      );
-      await this.createAuditLog(newOrder, user.id);
-
-      return newOrder;
-    } catch (e) {
-      throw e;
+      return OrdersService.validate({ order, userId }) && order;
+    } catch (err) {
+      throw err;
     }
   }
 
-  async createAuditLog(newOrder: Order, userId: string, oldOrder?: Order) {
+  async update({ uid, userId }: FindUserOrderParams) {
     try {
-      const auditLog = this.ordersAuditLogRepository.create({
-        orderUid: newOrder.uid,
-        userId,
-        oldStatusId: oldOrder?.statusId,
-        newStatusId: newOrder.statusId,
-        oldStatusName: oldOrder?.statusName,
-        newStatusName: newOrder.statusName,
-        oldStatusInternalName: oldOrder?.statusInternalName,
-        newStatusInternalName: newOrder.statusInternalName,
-        oldStatusPercent: oldOrder?.statusPercent,
-        newStatusPercent: newOrder.statusPercent,
-        isDeleted: newOrder.isDeleted,
-      });
+      const [existOrder, midpassOrder] = await Promise.all([
+        this.find({ uid, userId }),
+        this.apiService.getStatusFromMidpass({ uid }),
+      ]);
 
-      return await this.ordersAuditLogRepository.save(auditLog);
-    } catch (e) {
-      this.appResponseService.error(LogsTypes.Error, e);
-    }
-  }
+      const order = this.ordersRepository.merge(existOrder, midpassOrder);
 
-  async findAuditLogs(orderUid: string) {
-    return await this.ordersAuditLogRepository.findBy({ orderUid });
-  }
-
-  async update(existingOrder: Order, userId: string) {
-    try {
-      const oldOrder = JSON.parse(JSON.stringify(existingOrder)) as Order;
-      const updateOrderDto = await this.getStatusFromMidpass(existingOrder);
-
-      (existingOrder.sourceUid = updateOrderDto.sourceUid),
-        (existingOrder.receptionDate = updateOrderDto.receptionDate),
-        (existingOrder.statusId =
-          updateOrderDto.passportStatus.passportStatusId),
-        (existingOrder.statusName = updateOrderDto.passportStatus.name),
-        (existingOrder.statusDescription =
-          updateOrderDto.passportStatus.description),
-        (existingOrder.statusColor = updateOrderDto.passportStatus.color),
-        (existingOrder.statusSubscription =
-          updateOrderDto.passportStatus.subscription),
-        (existingOrder.statusInternalName = updateOrderDto.internalStatus.name),
-        (existingOrder.statusPercent = updateOrderDto.internalStatus.percent),
-        (existingOrder.isDeleted = false),
-        await this.ordersRepository.save(existingOrder);
-
-      await this.createAuditLog(existingOrder, userId, oldOrder);
-    } catch (e) {
-      return e;
+      return this.ordersRepository.save(order);
+    } catch (err) {
+      return err;
     }
   }
 
   async findAll() {
     try {
-      return await this.ordersRepository.find();
-    } catch (e) {
-      throw e;
+      return this.ordersRepository.find();
+    } catch (err) {
+      throw err;
     }
   }
 
-  async find(uid: string) {
+  async findAllActive() {
     try {
-      return await this.ordersRepository.findOneBy({
-        uid,
+      return this.ordersRepository.find({
+        where: filterActive(),
       });
-    } catch (e) {
-      throw e;
+    } catch (err) {
+      throw err;
     }
   }
 
-  async findAllFiltered() {
+  async delete({ uid, userId }: FindUserOrderParams) {
     try {
-      return await this.ordersRepository.findBy({
-        isDeleted: false,
+      const order = await this.ordersRepository.findOne({
+        where: filterOrder({ uid, userId }),
       });
-    } catch (e) {
-      throw e;
+
+      order.isDeleted = true;
+      return this.ordersRepository.save(order);
+    } catch (err) {
+      throw err;
     }
   }
 
-  async delete(uid: string, user: User) {
+  async deleteAll(userId: Order['userId']) {
     try {
-      const result = await this.ordersRepository
-        .createQueryBuilder()
-        .update(Order)
-        .set({ isDeleted: true })
-        .where({ uid, userId: user.id })
-        .returning('*') // updatedOrder
-        .execute();
+      const orders = await this.ordersRepository.find({
+        where: filterOrderByUser({ userId }),
+      });
 
-      const updatedOrder = result.raw[0];
-
-      if (!updatedOrder) {
-        throw LogsTypes.ErrorOrderNotFound;
+      for (const order of orders) {
+        order.isDeleted = true;
       }
 
-      await this.createAuditLog(updatedOrder, user.id);
-    } catch (e) {
-      throw e;
-    }
-  }
-
-  async deleteAll(user: User) {
-    try {
-      const result = await this.ordersRepository
-        .createQueryBuilder()
-        .update(Order)
-        .set({ isDeleted: true })
-        .where({ userId: user.id, isDeleted: false }) // Добавляем условие isDeleted: false, чтобы не обновлять уже удаленные заказы
-        .returning('*') // Order[]
-        .execute();
-
-      const updatedOrders = result.raw as Order[];
-
-      if (updatedOrders.length > 0) {
-        for (const order of updatedOrders) {
-          await this.createAuditLog(order, user.id);
-        }
-      } else {
-        throw LogsTypes.ErrorOrdersNotFound;
-      }
-    } catch (e) {
-      throw e;
+      return this.ordersRepository.save(orders);
+    } catch (err) {
+      throw err;
     }
   }
 }

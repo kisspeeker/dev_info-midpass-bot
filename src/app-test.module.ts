@@ -6,6 +6,7 @@ import { BotService } from './bot/bot.service';
 import { AppResponseService } from './app-response/app-response.service';
 import { LogsTypes } from './enums';
 import { KeyboardService } from './keyboard/keyboard.service';
+import { ApiModule } from './api/api.module';
 
 const mockUsersPart = [
   {
@@ -163,5 +164,6 @@ export const mockUsers = mockUsersPart.map((mock) => {
     },
   ],
   exports: [BotService, KeyboardService, CustomI18nService, AppResponseService],
+  imports: [ApiModule],
 })
 export class AppTestModule {}

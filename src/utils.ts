@@ -1,3 +1,6 @@
+import { createReadStream, existsSync } from 'fs';
+import { resolve } from 'path';
+
 export function declOfNum(number: number, titles: string[]) {
   const cases = [2, 0, 1, 1, 1, 2];
   return titles[
@@ -47,15 +50,23 @@ export function calculateDaysDifference(
   return diffInDays;
 }
 
-export function isValidDate(checkingDate: string | Date) {
-  const date = new Date(checkingDate);
+export function isValidDate(value: string | Date) {
+  const date = new Date(value);
   return (
     !isNaN(+date) &&
     date instanceof Date &&
-    Math.abs(new Date().getFullYear() - date.getFullYear()) < 5
+    Math.abs(new Date().getFullYear() - date.getFullYear()) < 5 // TODO: мб не требуется
   );
 }
 
 export async function sleep(delay: number = 100) {
   await new Promise(resolve => setTimeout(resolve, delay));
 }
+
+export const getStatusImage = async (percent: number | string) => {
+  const statusImagePath = resolve(`./public/images/${percent}.png`);
+
+  return existsSync(statusImagePath)
+    ? createReadStream(statusImagePath)
+    : createReadStream(resolve('./public/images/fallback.png'));
+};

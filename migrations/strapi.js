@@ -38,7 +38,6 @@ async function createTables(db) {
             `
           CREATE TABLE IF NOT EXISTS ${ORDER_TABLE_NAME} (
             uid TEXT PRIMARY KEY,
-            shortUid TEXT,
             userId INTEGER,
             sourceUid TEXT,
             receptionDate DATE,
@@ -103,7 +102,7 @@ async function insertData(db, jsonData) {
             db.run(
               `
         INSERT OR IGNORE INTO ${ORDER_TABLE_NAME} (
-          uid, shortUid, userId, sourceUid, receptionDate,
+          uid, userId, sourceUid, receptionDate,
           statusId, statusName, statusDescription, statusColor,
           statusSubscription, statusInternalName, statusPercent,
           isDeleted, createdAt, updatedAt
@@ -112,7 +111,6 @@ async function insertData(db, jsonData) {
       `,
               [
                 code.uid,
-                code.shortUid,
                 entry.chatId,
                 code.sourceUid,
                 code.receptionDate,

@@ -5,10 +5,11 @@ import { HttpModule } from '@nestjs/axios';
 import { OrdersService } from 'src/orders/orders.service';
 import { Order } from 'src/orders/entity/order.entity';
 import { OrderAudit } from 'src/orders/entity/order-audit.entity';
+import { OrdersAuditService } from 'src/orders/orders-audit.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Order, OrderAudit]), HttpModule],
-  providers: [OrdersService],
-  exports: [TypeOrmModule, OrdersService],
+  providers: [OrdersService, OrdersAuditService],
+  exports: [TypeOrmModule, OrdersService, OrdersAuditService],
 })
 export class OrdersModule {}

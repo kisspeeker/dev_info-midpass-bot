@@ -7,21 +7,19 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
   OneToMany,
-  BeforeUpdate,
+  InsertEvent,
+  AfterUpdate,
 } from 'typeorm';
 import { User } from 'src/users/entity/user.entity';
-import { calculateDaysDifference, getLocaleDateString } from 'src/utils';
+import { getLocaleDateString } from 'src/utils';
 import { OrderAudit } from './order-audit.entity';
 import { DB_ORDER_TABLE_NAME } from 'src/constants/db-order-table-name';
-import { DbActions } from 'src/enums/db-actions';
+import { ORDER_UID_SHORT_LENGTH } from 'src/constants/order-uid-short-length';
 
 @Entity({ name: DB_ORDER_TABLE_NAME })
 export class Order {
   @PrimaryColumn()
   uid: string;
-
-  @Column()
-  shortUid: string;
 
   @Column()
   userId: string;
@@ -69,7 +67,9 @@ export class Order {
   @OneToMany(() => OrderAudit, audit => audit.order)
   audits: OrderAudit[];
 
-  // private originalValue: Order;
+  get shortUid() {
+    return `*${this.uid.slice(-ORDER_UID_SHORT_LENGTH)}`;
+  }
 
   get isNew() {
     return this.statusPercent === null;
@@ -79,48 +79,9 @@ export class Order {
     return getLocaleDateString(this.updatedAt);
   }
 
-  get daysPassed() {
-    const days = calculateDaysDifference(this.receptionDate);
-    return Number.isNaN(days) ? '-' : days;
-  }
-
-  get formatBeauty() {
-    return {
-      ...this,
-      statusPercent: this.statusPercent === null ? '-' : this.statusPercent,
-      statusName: this.statusName === null ? '-' : this.statusName,
-      statusInternalName:
-        this.statusInternalName === null ? '-' : this.statusInternalName,
-      updatedAtTimeString: this.updatedAtTimeString,
-      daysPassed: this.daysPassed,
-    };
-  }
-
-  @BeforeUpdate()
-  setDefaultsOnUpdate() {
-    // this.updatedAt = new Date();
-    // this.createAuditRecord('UPDATE');
-  }
-
-  private createAuditRecord(action: DbActions) {
-    const auditRecord = new OrderAudit();
-    // auditRecord.order = this;
-    // auditRecord.action = action;
-    // auditRecord.oldValue = JSON.stringify(this.originalValues);
-    // auditRecord.newValue = JSON.stringify({ ...this, updatedAt: new Date() });
-
-    // orderUid: newOrder.uid,
-    // userId,
-    // oldStatusId: oldOrder?.statusId,
-    // newStatusId: newOrder.statusId,
-    // oldStatusName: oldOrder?.statusName,
-    // newStatusName: newOrder.statusName,
-    // oldStatusInternalName: oldOrder?.statusInternalName,
-    // newStatusInternalName: newOrder.statusInternalName,
-    // oldStatusPercent: oldOrder?.statusPercent,
-    // newStatusPercent: newOrder.statusPercent,
-    // isDeleted: newOrder.isDeleted,
-
-    this.audits.push(auditRecord);
+  @AfterUpdate()
+  setDefaultsOnUpdate(event: InsertEvent<Order>) {
+    const orderAudit = event.connection.manager.create(OrderAudit, this);
+    event.connection.manager.save(orderAudit);
   }
 }

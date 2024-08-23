@@ -1,7 +1,7 @@
 /**
  * Статусы завершенных заявлений в текстовом формате
  */
-export const ORDER_FINAL_STATUSES = [
+export const ORDER_COMPLETE_STATUSES = [
   'паспорт выдан',
   'отмена изготовления паспорта',
 ];

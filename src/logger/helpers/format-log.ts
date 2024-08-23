@@ -1,22 +1,10 @@
-import type { LogType } from 'src/logger/constants/log-types';
+import { FormatLogParams } from 'src/logger/types/format-log-params';
 import { getLocaleDateStringFormatted } from 'src/utils';
-
-interface TransformableInfo {
-  level: string;
-  message: any;
-  logtype: LogType;
-  meta?: unknown;
-}
 
 /**
  * TODO: изменить текст лога
  */
-export const formatLog = ({
-  level,
-  message,
-  logtype,
-  meta,
-}: TransformableInfo) => {
+export const formatLog = ({ level, message, logtype, meta }: FormatLogParams) => {
   const date = getLocaleDateStringFormatted();
 
   const metaString = meta ? `META<<<${JSON.stringify(meta)}>>>META` : '';

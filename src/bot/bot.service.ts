@@ -12,12 +12,11 @@ import { Telegraf, session } from 'telegraf';
 
 @Injectable()
 export class BotService {
-  public bot: Telegraf;
+  bot: Telegraf = new Telegraf<AppContext>(TG_BOT_TOKEN, {
+    telegram: { webhookReply: false },
+  });
 
-  public constructor(private readonly i18n: CustomI18nService) {
-    this.bot = new Telegraf<AppContext>(TG_BOT_TOKEN, {
-      telegram: { webhookReply: false },
-    });
+  constructor(private readonly i18n: CustomI18nService) {
     this.bot.use(this.createRateLimitMiddleware());
     this.bot.use(this.createDefaultBotSession());
   }
@@ -46,13 +45,13 @@ export class BotService {
     });
   }
 
-  public async notify(message: string) {
+  async notify(message: string) {
     return this.bot.telegram.sendMessage(TG_OWNER_ID, message, {
       parse_mode: 'HTML',
     });
   }
 
-  public async startBot() {
+  async startBot() {
     if (!IS_UNDER_CONSTRUCTION) {
       await this.bot.telegram.setMyCommands(this.botCommands);
     }

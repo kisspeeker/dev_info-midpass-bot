@@ -53,4 +53,10 @@ export class User {
   get ordersFormatBeauty() {
     return this.orders.map(order => order.formatBeauty).join('\n\n');
   }
+
+  get activeOrdersCount() {
+    return this.orders.reduce((count, order) => {
+      return order.isDeleted ? count : count + 1;
+    }, 0);
+  }
 }

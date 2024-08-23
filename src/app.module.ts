@@ -35,10 +35,7 @@ import { AppResponseModule } from 'src/app-response/app-response.module';
         path: join(__dirname, '/i18n/'),
         watch: true,
       },
-      resolvers: [
-        { use: QueryResolver, options: ['lang'] },
-        AcceptLanguageResolver,
-      ],
+      resolvers: [{ use: QueryResolver, options: ['lang'] }, AcceptLanguageResolver],
     }),
     TypeOrmModule.forRoot({
       type: 'sqlite',
