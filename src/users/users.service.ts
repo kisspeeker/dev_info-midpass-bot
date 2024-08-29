@@ -27,10 +27,7 @@ export class UsersService {
     }
   }
 
-  async find({
-    telegramUser,
-    isOwner = false,
-  }: {
+  async find({ telegramUser,isOwner = false }: {
     telegramUser: TelegramUser;
     isOwner?: User['isOwner'];
   }) {

@@ -1,5 +1,5 @@
 // TODO: доработать, фикс admin, admin1 в массив мб
-export enum CmdText {
+export enum CommandText {
   Admin = '/admin',
   Admin1 = '/админ',
 

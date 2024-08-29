@@ -8,19 +8,11 @@ import {
 } from 'typeorm';
 
 import { Order } from 'src/orders/entity/order.entity';
-import { TelegramUser } from 'src/types/telegram-user';
 import { DB_USER_TABLE_NAME } from 'src/constants/db-user-table-name';
 import { TG_OWNER_ID } from 'src/constants/tg-owner-id';
 
 @Entity({ name: DB_USER_TABLE_NAME })
 export class User {
-  constructor({ id, first_name, last_name, username }: TelegramUser) {
-    this.id = String(id);
-    this.firstName = first_name;
-    this.lastName = last_name;
-    this.userName = username ? `@${username}` : '';
-  }
-
   @PrimaryColumn()
     id: string;
 

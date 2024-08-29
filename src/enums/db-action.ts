@@ -1,4 +1,4 @@
-export enum DbActions {
+export enum DbAction {
   Create = 'CREATE',
   Update = 'UPDATE',
 }

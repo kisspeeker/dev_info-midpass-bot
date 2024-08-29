@@ -24,16 +24,17 @@ export class MessageService {
   }
 
   async checkBlockedUser(e, user: User) {
-    const isBlockedUser =
-      e &&
-      e.response &&
-      e.response.error_code &&
-      e.on &&
-      e.on.payload &&
-      e.on.payload.chat_id;
+    const isBlockedUser
+      = e
+      && e.response
+      && e.response.error_code
+      && e.on
+      && e.on.payload
+      && e.on.payload.chat_id;
 
     if (isBlockedUser) {
       await this.ordersService.deleteAll(user);
+      
       return await this.appResponseService.error(
         LogsTypes.ErrorBlockByUser,
         e,
@@ -42,6 +43,7 @@ export class MessageService {
         },
       );
     }
+    
     return false;
   }
 
@@ -55,10 +57,11 @@ export class MessageService {
     try {
       await this.bot.telegram.sendMessage(user.id, message, {
         parse_mode: 'HTML',
-        disable_web_page_preview: true,
+        link_preview_options: { is_disabled: true },
         ...this.keyboardService.useKeyboardDefault(user),
         ...extra,
       });
+      
       return this.appResponseService.success(LogsTypes.TgMessageSent, user.id, {
         user,
       });
@@ -68,6 +71,7 @@ export class MessageService {
       if (isBlockerUser) {
         return isBlockerUser;
       }
+      
       return this.appResponseService.error(LogsTypes.ErrorUserSendMessage, e, {
         user,
       });
@@ -83,10 +87,11 @@ export class MessageService {
           : this.i18n.t('user.message_orders_list_empty'),
         {
           parse_mode: 'HTML',
-          disable_web_page_preview: true,
+          link_preview_options: { is_disabled: true },
           ...this.keyboardService.useKeyboardInlineOrders(user),
         },
       );
+      
       return this.appResponseService.success(LogsTypes.TgOrdersSent, user.id);
     } catch (e) {
       const isBlockerUser = await this.checkBlockedUser(e, user);
@@ -94,6 +99,7 @@ export class MessageService {
       if (isBlockerUser) {
         return isBlockerUser;
       }
+      
       return this.appResponseService.error(
         LogsTypes.ErrorUserSendMessageInlineOrders,
         e,
@@ -108,10 +114,11 @@ export class MessageService {
         this.i18n.t('user.message_unsubscribe'),
         {
           parse_mode: 'HTML',
-          disable_web_page_preview: true,
+          link_preview_options: { is_disabled: true },
           ...this.keyboardService.useKeyboardInlineUnsubscribe(user),
         },
       );
+      
       return this.appResponseService.success(
         LogsTypes.TgUnsubscribeSent,
         user.id,
@@ -122,6 +129,7 @@ export class MessageService {
       if (isBlockerUser) {
         return isBlockerUser;
       }
+      
       return this.appResponseService.error(
         LogsTypes.ErrorUserSendMessageInlineUnsubscribe,
         e,
@@ -183,6 +191,7 @@ export class MessageService {
           ...this.keyboardService.useKeyboardDefault(user),
         },
       );
+      
       return this.appResponseService.success(LogsTypes.TgStatusSent, user.id);
     } catch (e) {
       const isBlockerUser = await this.checkBlockedUser(e, user);
@@ -190,6 +199,7 @@ export class MessageService {
       if (isBlockerUser) {
         return isBlockerUser;
       }
+      
       return this.appResponseService.error(
         LogsTypes.ErrorUserSendMessageStatus,
         e,

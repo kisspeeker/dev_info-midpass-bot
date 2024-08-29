@@ -43,6 +43,7 @@ export class AutoupdateService {
         true,
         'Europe/Moscow',
       );
+
       this.schedulerRegistry.addCronJob(name, job);
       this.schedulerRegistry.getCronJob(name).start();
     });
@@ -51,19 +52,17 @@ export class AutoupdateService {
   private async handleAutoupdateOrders() {
     const startDate = new Date();
     const counter = this.initAutoupdateCounter();
+
     this.appResponseService.success(LogsTypes.AutoupdateStart, `${startDate}`);
 
     try {
-      const ordersResponse = await this.ordersService.findAllFiltered();
-      if (!ordersResponse.success) {
-        throw ordersResponse;
-      }
+      const orders = await this.ordersService.findAllActive();
 
-      const orders = ordersResponse.data;
       counter.ordersAll = orders.length;
 
       for (const order of orders) {
         const res = await this.processOrder(order, counter);
+
         if (res.error === LogsTypes.ErrorMidpassTimeout) {
           throw res;
         }
@@ -72,19 +71,11 @@ export class AutoupdateService {
 
       counter.usersChecked = [...new Set(counter.usersCheckedList)].length;
       counter.duration = calculateTimeDifference(startDate);
-    } catch (e) {
-      this.appResponseService.error(
-        LogsTypes.ErrorAutoupdateRoot,
-        'error in autoupdate.service.handleAutoupdateOrders',
-      );
-    } finally {
-      this.appResponseService.success(
-        LogsTypes.AutoupdateEnd,
-        `${new Date()}`,
-        null,
-        { counter },
-      );
-    }
+    } catch (err) {
+      throw err;
+    } 
+    
+    return counter;
   }
 
   private initAutoupdateCounter(): AutoupdateCounter {
@@ -97,6 +88,7 @@ export class AutoupdateService {
       ordersErrorMidpassNotFound: 0,
       routes: API_ROUTE_MIDPASS_PROXIES.reduce((acc, curr) => {
         acc[curr] = 0;
+        
         return acc;
       }, {}),
       usersCheckedList: [],
@@ -123,8 +115,7 @@ export class AutoupdateService {
       }
       const midpassResult = midpassResultResponse.data;
 
-      counter.routes[midpassResult.proxy] =
-        (counter.routes[midpassResult.proxy] || 0) + 1;
+      counter.routes[midpassResult.proxy] = (counter.routes[midpassResult.proxy] || 0) + 1;
 
       const hasChanges = OrdersService.isDifferentOrders(
         order,
@@ -133,10 +124,12 @@ export class AutoupdateService {
 
       if (hasChanges) {
         const userResponse = await this.usersService.find({ id: order.userId });
+
         if (!userResponse.success) {
           return;
         }
         const user = userResponse.data;
+
         counter.ordersUpdated++;
         this.messageService.sendMessageStatus(user, midpassResult.order);
         this.appResponseService.success(
@@ -145,6 +138,7 @@ export class AutoupdateService {
           null,
           { order },
         );
+        
         return;
       }
       this.appResponseService.success(
@@ -164,13 +158,13 @@ export class AutoupdateService {
       return e?.error === LogsTypes.ErrorMidpassTimeout
         ? e
         : this.appResponseService.error(
-            LogsTypes.ErrorAutoupdateOrder,
-            e?.error || e?.message || e,
-            null,
-            {
-              order,
-            },
-          );
+          LogsTypes.ErrorAutoupdateOrder,
+          e?.error || e?.message || e,
+          null,
+          {
+            order,
+          },
+        );
     }
   }
 }

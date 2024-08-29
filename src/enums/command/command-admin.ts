@@ -1,4 +1,4 @@
-export enum CmdAdmin {
+export enum CommandAdmin {
   User = 'user',
   Order = 'order',
   Audit = 'audit',

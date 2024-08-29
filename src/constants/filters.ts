@@ -29,10 +29,7 @@ export const filterByActiveOrder = () => ({
   },
 });
 
-export const filterOrder = ({ uid, userId }: FindOrderParams) => ({
-  uid,
-  userId,
-});
+export const filterOrder = ({ uid, userId }: FindOrderParams) => ({ uid, userId });
 
 export const filterOrderByUser = ({ userId, isDeleted = false }: {
   userId: Order['userId'];

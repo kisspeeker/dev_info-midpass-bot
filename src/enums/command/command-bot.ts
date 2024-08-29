@@ -1,4 +1,4 @@
-export enum CmdBot {
+export enum CommandBot {
   Start = 'start',
   Support = 'support',
   FaqBase = 'faq',
