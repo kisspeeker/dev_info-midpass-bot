@@ -6,7 +6,6 @@ import { getLocaleDateStringFormatted } from 'src/utils';
  */
 export const formatLog = ({ level, message, logtype, meta }: FormatLogParams) => {
   const date = getLocaleDateStringFormatted();
-
   const metaString = meta ? `META<<<${JSON.stringify(meta)}>>>META` : '';
 
   return `${date} мск / ${logtype} [${level}]: ${message} ${metaString}`;

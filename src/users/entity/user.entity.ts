@@ -22,28 +22,28 @@ export class User {
   }
 
   @PrimaryColumn()
-  id: string;
+    id: string;
 
   @Column({ nullable: true })
-  firstName: string;
+    firstName: string;
 
   @Column({ nullable: true })
-  lastName: string;
+    lastName: string;
 
   @Column({ nullable: true })
-  userName: string;
+    userName: string;
 
   @Column({ nullable: true })
-  isBlocked: boolean;
+    isBlocked: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+    createdAt: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+    updatedAt: Date;
 
   @OneToMany(() => Order, order => order.user)
-  orders: Order[];
+    orders: Order[];
 
   get isOwner() {
     return this.id === TG_OWNER_ID;

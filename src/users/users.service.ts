@@ -20,6 +20,7 @@ export class UsersService {
   async create(telegramUser: TelegramUser) {
     try {
       const user = this.usersRepository.create(parseTelegramUser(telegramUser));
+      
       return this.usersRepository.save(user);
     } catch (err) {
       throw err;
@@ -69,6 +70,7 @@ export class UsersService {
       const user = await this.find({ telegramUser });
 
       user.isBlocked = true;
+      
       return this.usersRepository.save(user);
     } catch (err) {
       throw err;
@@ -80,6 +82,7 @@ export class UsersService {
       const user = await this.find({ telegramUser });
 
       user.isBlocked = false;
+      
       return this.usersRepository.save(user);
     } catch (err) {
       throw err;

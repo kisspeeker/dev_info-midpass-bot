@@ -34,16 +34,10 @@ export const filterOrder = ({ uid, userId }: FindOrderParams) => ({
   userId,
 });
 
-export const filterOrderByUser = ({
-  userId,
-  isDeleted = false,
-}: {
+export const filterOrderByUser = ({ userId, isDeleted = false }: {
   userId: Order['userId'];
   isDeleted?: Order['isDeleted'];
-}) => ({
-  userId,
-  isDeleted,
-});
+}) => ({ userId, isDeleted });
 
 export const filterUser = ({ telegramUser: { id, username }, isOwner = false }: FindUserParams) => [
   { id: String(id), isOwner },

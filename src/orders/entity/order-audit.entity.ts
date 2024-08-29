@@ -11,9 +11,9 @@ export class OrderAudit extends Order {
   }
 
   @PrimaryGeneratedColumn()
-  id: string;
+    id: string;
 
   @ManyToOne(() => Order, order => order.audits)
   @JoinColumn({ name: 'orderUid' })
-  order: Order;
+    order: Order;
 }

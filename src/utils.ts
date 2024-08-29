@@ -3,6 +3,7 @@ import { resolve } from 'path';
 
 export function declOfNum(number: number, titles: string[]) {
   const cases = [2, 0, 1, 1, 1, 2];
+  
   return titles[
     number % 100 > 4 && number % 100 < 20
       ? 2
@@ -52,10 +53,11 @@ export function calculateDaysDifference(
 
 export function isValidDate(value: string | Date) {
   const date = new Date(value);
+  
   return (
-    !isNaN(+date) &&
-    date instanceof Date &&
-    Math.abs(new Date().getFullYear() - date.getFullYear()) < 5 // TODO: мб не требуется
+    !isNaN(+date)
+    && date instanceof Date
+    && Math.abs(new Date().getFullYear() - date.getFullYear()) < 5 // TODO: мб не требуется
   );
 }
 

@@ -19,53 +19,53 @@ import { ORDER_UID_SHORT_LENGTH } from 'src/constants/order-uid-short-length';
 @Entity({ name: DB_ORDER_TABLE_NAME })
 export class Order {
   @PrimaryColumn()
-  uid: string;
+    uid: string;
 
   @Column()
-  userId: string;
+    userId: string;
 
   @Column({ nullable: true })
-  sourceUid: string;
+    sourceUid: string;
 
   @Column({ nullable: true })
-  receptionDate: string;
+    receptionDate: string;
 
   @Column({ nullable: true })
-  statusId: number;
+    statusId: number;
 
   @Column({ nullable: true })
-  statusName: string;
+    statusName: string;
 
   @Column({ nullable: true })
-  statusDescription: string;
+    statusDescription: string;
 
   @Column({ nullable: true })
-  statusColor: string;
+    statusColor: string;
 
   @Column({ nullable: true })
-  statusSubscription: boolean;
+    statusSubscription: boolean;
 
   @Column({ nullable: true })
-  statusInternalName: string;
+    statusInternalName: string;
 
   @Column({ nullable: true })
-  statusPercent: number;
+    statusPercent: number;
 
   @Column({ default: false })
-  isDeleted: boolean;
+    isDeleted: boolean;
 
   @CreateDateColumn()
-  createdAt: Date;
+    createdAt: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+    updatedAt: Date;
 
   @ManyToOne(() => User, user => user.orders)
   @JoinColumn({ name: 'userId' })
-  user: User;
+    user: User;
 
   @OneToMany(() => OrderAudit, audit => audit.order)
-  audits: OrderAudit[];
+    audits: OrderAudit[];
 
   get shortUid() {
     return `*${this.uid.slice(-ORDER_UID_SHORT_LENGTH)}`;
@@ -82,6 +82,7 @@ export class Order {
   @AfterUpdate()
   setDefaultsOnUpdate(event: InsertEvent<Order>) {
     const orderAudit = event.connection.manager.create(OrderAudit, this);
+
     event.connection.manager.save(orderAudit);
   }
 }

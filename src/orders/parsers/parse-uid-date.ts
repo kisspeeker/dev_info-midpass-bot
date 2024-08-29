@@ -6,5 +6,6 @@ export const parseUidDate = (uid: Order['uid']) => {
     /^(\d{9})(\d{4})(\d{2})(\d{2})/,
   );
   const result = `${year}-${month}-${day}`;
+  
   return isValidDate(result) && result;
 };

@@ -20,19 +20,19 @@ export class BotService {
     this.bot.use(this.createRateLimitMiddleware());
     this.bot.use(this.createDefaultBotSession());
   }
-
+  
   private get botCommands() {
     return Object.values(CmdBot).map(command => ({
       command,
       description: this.i18n.t(`user.command_${command}`),
     }));
   }
-
+  
   private createRateLimitMiddleware() {
     return rateLimit({
       window: TG_RATE_LIMIT,
       limit: 1,
-      onLimitExceeded: ctx => {
+      onLimitExceeded: (ctx: AppContext) => {
         // ctx.reply(this.i18n.t('user_errors.message_rate_limit'));
         this.notify(this.i18n.t('admin.user_spaming', { id: ctx.from.id }));
       },

@@ -91,6 +91,7 @@ export class OrdersService {
       });
 
       order.isDeleted = true;
+      
       return this.ordersRepository.save(order);
     } catch (err) {
       throw err;
